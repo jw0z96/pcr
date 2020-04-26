@@ -15,6 +15,8 @@
 #include <tinyply/tinyply.h>
 #include "ply_utils.h"
 
+#include "ShaderProgram.h"
+
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
 
@@ -103,84 +105,17 @@ int main(int argc, char *argv[])
 	const std::string vertexPath = "shaders/points_vert.glsl";
 	const std::string fragmentPath = "shaders/points_frag.glsl";
 
-	std::string vertexCode, fragmentCode;
-	std::ifstream vShaderFile, fShaderFile;
-
-	// ensure ifstream objects can throw exceptions:
-	vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-	fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-	try
+	ShaderProgram pointsShader;
+	pointsShader.loadShaderSource(GL_VERTEX_SHADER, vertexPath);
+	pointsShader.loadShaderSource(GL_FRAGMENT_SHADER, fragmentPath);
+	if (pointsShader.compile())
 	{
-		// open files
-		vShaderFile.open(vertexPath);
-		fShaderFile.open(fragmentPath);
-		std::stringstream vShaderStream, fShaderStream;
-		// read file's buffer contents into streams
-		vShaderStream << vShaderFile.rdbuf();
-		fShaderStream << fShaderFile.rdbuf();
-		// close file handlers
-		vShaderFile.close();
-		fShaderFile.close();
-		// convert stream into string
-		vertexCode = vShaderStream.str();
-		fragmentCode = fShaderStream.str();
-	}
-	catch(std::ifstream::failure e)
-	{
-		std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
-	}
-
-	// compile and link shaders, store error status & log
-	int success;
-	char infoLog[512];
-
-	// vertex shader
-	unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	const char * vertexStr = vertexCode.c_str();
-	glShaderSource(vertexShader, 1, &vertexStr, NULL);
-	glCompileShader(vertexShader);
-
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if(!success)
-	{
-		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-	}
-
-	// fragment shader
-	unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	const char * fragmentStr = fragmentCode.c_str();
-	glShaderSource(fragmentShader, 1, &fragmentStr, NULL);
-	glCompileShader(fragmentShader);
-
-	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-	if(!success)
-	{
-		glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-	}
-
-	// create shader program and link
-	unsigned int shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
-
-	// if the shader program linked, delete the shaders?
-	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-	if(success)
-	{
-		glDeleteShader(vertexShader);
-		glDeleteShader(fragmentShader);
+		pointsShader.use();
 	}
 	else
 	{
-		glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+		std::cout<<"Error: pointsShader did not compile!\n";
 	}
-
-	// use the shader
-	glUseProgram(shaderProgram);
 
 	// read the vertex positions and colours from the ply file
 	std::shared_ptr<tinyply::PlyData> vert_pos, vert_col;
@@ -212,10 +147,10 @@ int main(int argc, char *argv[])
 
 	// Camera variables
 	const glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-	const int projectionLoc = glGetUniformLocation(shaderProgram, "projection");
+	const int projectionLoc = pointsShader.getUniformLocation("projection");
 	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-	const int viewLoc = glGetUniformLocation(shaderProgram, "view");
+	const int viewLoc = pointsShader.getUniformLocation("view");
 
 	// glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f,  3.0f);
 	// glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -234,7 +169,7 @@ int main(int argc, char *argv[])
 	);
 	// const glm::mat4 model = glm::rotate(glm::mat4(1.0), 3.14159f/2.0f, glm::vec3(-1.0f, 0.0f, 0.0f));
 
-	const int modelLoc = glGetUniformLocation(shaderProgram, "model");
+	const int modelLoc = pointsShader.getUniformLocation("model");
 	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
 
@@ -289,6 +224,7 @@ int main(int argc, char *argv[])
 	}
 
 	// std::cout<<"error: "<<glGetError()<<"\n";
+	pointsShader.deleteProgram();
 
 	SDL_DestroyWindow(window);
 	SDL_Quit();

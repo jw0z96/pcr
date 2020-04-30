@@ -12,50 +12,59 @@ class ShaderProgram
 {
 public:
 
-	ShaderProgram() : m_shaderProgramID(0) // this shouldn't be necessary, but i've been burned in the past
+	ShaderProgram() : m_shaderProgramID(glCreateProgram())
 	{}
 
 	// ~ShaderProgram() {}; // let the compiler do this :)
+	inline ~ShaderProgram() { glDeleteProgram(m_shaderProgramID); }
 
-	inline void loadShaderSource(GLenum shaderType, const std::string &shaderPath)
+	inline void addShaderSource(GLenum shaderType, const std::string &shaderPath)
 	{
-		// ensure ifstream objects can throw exceptions:
-		std::ifstream shaderFile;
-		shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-		std::stringstream shaderStream;
-		try
-		{
-			shaderFile.open(shaderPath);
-			shaderStream << shaderFile.rdbuf();
-			shaderFile.close();
-		}
-		catch(std::ifstream::failure e)
-		{
-			std::cout << "Error: Whilst reading shader file " << shaderPath << "\n";
-			return;
-		}
-
-		const std::string & shaderSource = shaderStream.str();
-		if (shaderSource.empty())
-		{
-			std::cout << "Error: Shader file " << shaderPath << " is empty!\n";
-		}
-		else
-		{
-			const ShaderComponent component = {shaderType, shaderSource};
-			m_shaderComponents.push_back(component); // emplace_back doesn't work with struct {} ctors
-		}
+		const ShaderComponent component = {shaderType, shaderPath};
+		m_shaderComponents.push_back(component); // emplace_back doesn't work with struct {} ctors
 	}
 
 	inline bool compile()
 	{
-		// create a new shader program
-		const GLuint program = glCreateProgram();
+		// detach all existing shaders
+		{
+			GLuint existingShaders[16]; // max num of attachments reasonable...
+			GLsizei count;
+			glGetAttachedShaders(m_shaderProgramID, 16, &count, existingShaders);
+			if (count > 16)
+			{
+				std::cout<<"Error: cannot detach all shaders!\n";
+			}
 
+			for (unsigned int i = 0; i < count; ++i)
+			{
+				glDetachShader(m_shaderProgramID, existingShaders[i]);
+			}
+		}
+
+		// load all shaders from disk and attach
 		for (const ShaderComponent & component : m_shaderComponents)
 		{
+			// ensure ifstream objects can throw exceptions:
+			std::ifstream shaderFile;
+			shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+			std::stringstream shaderStream;
+			try
+			{
+				shaderFile.open(component.source);
+				shaderStream << shaderFile.rdbuf();
+				shaderFile.close();
+			}
+			catch(std::ifstream::failure e)
+			{
+				std::cout << "Error: Whilst reading shader file " << component.source << "\n";
+				return false; // unsuccessful
+			}
+
+			const std::string streamStr = shaderStream.str(); // ugh
+			const char * sourceStr = streamStr.c_str(); // ugh
+
 			const GLuint shader = glCreateShader(component.type);
-			const char * sourceStr = component.source.c_str(); // ugh
 			glShaderSource(shader, 1, &sourceStr, NULL);
 			glCompileShader(shader);
 
@@ -67,56 +76,42 @@ public:
 				glGetShaderInfoLog(shader, 512, NULL, log);
 				std::cout << "Error: compiling shader component of type " << component.type << ": " << log << "\n";
 				glDeleteShader(shader);
+				// glDeleteProgram(program);
 				return false; // unsuccessful
 			}
 
 			// attach the shader to the shader program, and then delete it,
 			// since it will be kept alive by the program
-			glAttachShader(program, shader);
+			glAttachShader(m_shaderProgramID, shader);
 			glDeleteShader(shader);
 		}
 
 		// link the shaders to the program and
-		glLinkProgram(program);
+		glLinkProgram(m_shaderProgramID);
+
 		int programSuccess;
-		glGetProgramiv(program, GL_LINK_STATUS, &programSuccess);
+		glGetProgramiv(m_shaderProgramID, GL_LINK_STATUS, &programSuccess);
 		if(!programSuccess)
 		{
 			char log[512];
-			glGetProgramInfoLog(program, 512, NULL, log);
+			glGetProgramInfoLog(m_shaderProgramID, 512, NULL, log);
 			std::cout << "Error linking shader program: " << log << "\n";
-			glDeleteProgram(program);
 			return false; // unsuccessful
 		}
 
-		// if we get here, shader compilation was successful, assign the shader ID member
-		m_shaderProgramID = program;
 		return true;
 	}
 
 	inline void use() const
 	{
-		if (m_shaderProgramID)
-		{
+		// if (m_shaderProgramID)
+		// {
 			glUseProgram(m_shaderProgramID);
-		}
-		else
-		{
-			std::cout << "Error: invalid shader cannot be used!\n";
-		}
-	}
-
-	inline void deleteProgram()
-	{
-		if (m_shaderProgramID)
-		{
-			glDeleteProgram(m_shaderProgramID);
-			m_shaderProgramID = 0;
-		}
-		else
-		{
-			std::cout << "Error: invalid shader cannot be deleted!\n";
-		}
+		// }
+		// else
+		// {
+			// std::cout << "Error: invalid shader cannot be used!\n";
+		// }
 	}
 
 	inline void clearComponents()
@@ -126,11 +121,11 @@ public:
 
 	inline GLint getUniformLocation(const char * uniformName) const
 	{
-		if (!m_shaderProgramID)
-		{
-			std::cout << "Error: getUniformLocation called on invalid shader!\n";
-			return 0;
-		}
+		// if (!m_shaderProgramID)
+		// {
+		// 	std::cout << "Error: getUniformLocation called on invalid shader!\n";
+		// 	return 0;
+		// }
 		return glGetUniformLocation(m_shaderProgramID, uniformName);
 	}
 
@@ -146,7 +141,7 @@ private:
 	std::list<ShaderComponent> m_shaderComponents;
 
 	// Shader program ID
-	GLuint m_shaderProgramID;
+	const GLuint m_shaderProgramID;
 };
 
 #endif // SHADERPROGRAM_H

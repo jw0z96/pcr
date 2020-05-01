@@ -3,6 +3,9 @@
 #include <fstream>
 #include <sstream>
 
+#include <algorithm>
+#include <random>
+
 #include <GL/glew.h> // load glew before SDL_opengl
 
 #include <SDL2/SDL.h>
@@ -138,16 +141,13 @@ int main(int argc, char *argv[])
 	// std::cout<<"gl error:"<<glGetError()<<"\n";
 
 	// tell OpenGL which attachments we'll use (of this framebuffer) for rendering
-	unsigned int attachments[] = { GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT };
-	glDrawBuffers(2, attachments);
+	unsigned int attachments[] = { GL_COLOR_ATTACHMENT0 }; // , GL_DEPTH_ATTACHMENT }; // we don't need to list the depth attachment
+	glDrawBuffers(1, attachments);
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 	{
 		std::cout << "Error: Framebuffer is not complete!\n";
 		return 1;
 	}
-
-	// // unbind fbo
-	// glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	// compile and use points shader
 	ShaderProgram pointsShader;
@@ -178,15 +178,21 @@ int main(int argc, char *argv[])
 		glUniform1i(outputShader.getUniformLocation("depthTexture"), 1);
 		// use texture unit 2 for the colour texture
 		glUniform1i(outputShader.getUniformLocation("colTexture"), 2);
+		// // use texture unit 3 for the colour texture
+		// glUniform1i(outputShader.getUniformLocation("visTexture"), 3);
 	}
 
 	// read the vertex positions and colours from the ply file
 	std::shared_ptr<tinyply::PlyData> vert_pos, vert_col;
 	ply_utils::read_ply_file(filepath, vert_pos, vert_col);
 	unsigned int num_verts = vert_pos ? vert_pos->count : 0;
+	std::cout<<"num_verts: "<<num_verts<<"\n";
+	// we want 'num_verts' bits to be allocated for the visibility buffer, but this has to be allocated in bytes
+	const size_t numVertsBytes = ceil(num_verts / 8.0f); // 8 bits per byte
+	std::cout<<"num bytes: "<<numVertsBytes<<"\n";
 
 	// we need to create a VAO and VBOs for the point cloud data
-	unsigned int verts_vao, verts_vbo, colBuffer, colTex, visibilityBuffer;
+	unsigned int verts_vao, verts_vbo, colBuffer, colTex, visBuffer, elementBuffer;
 	{
 		// we have to generate and bind a VAO for the whole lot
 		glGenVertexArrays(1, &verts_vao);
@@ -206,7 +212,10 @@ int main(int argc, char *argv[])
 		glGenBuffers(1, &colBuffer);
 		glBindBuffer(GL_TEXTURE_BUFFER, colBuffer);
 		glBufferData(GL_TEXTURE_BUFFER, vert_col->buffer.size_bytes(), vert_col->buffer.get(), GL_STATIC_DRAW);
+		// map it to a texture
 		glGenTextures(1, &colTex);
+		glBindTexture(GL_TEXTURE_BUFFER, colTex);
+		glTexBuffer(GL_TEXTURE_BUFFER, GL_R8UI, colBuffer);
 
 		// glActiveTexture(GL_TEXTURE1);
 		// glBindTexture(GL_TEXTURE_BUFFER, colTex);
@@ -217,13 +226,18 @@ int main(int argc, char *argv[])
 		// glEnableVertexAttribArray(1);
 		// glVertexAttribIPointer(1, 3, GL_UNSIGNED_BYTE, 3 * sizeof(unsigned char), (void*)0); // sized type
 
-
 		// generate an SSBO for the visibility
-		// glGenBuffers(1, &visibilityBuffer);
-		// glBindBuffer(GL_SHADER_STORAGE_BUFFER, visibilityBuffer);
-		// glBufferData(GL_SHADER_STORAGE_BUFFER, num_verts * sizeof(bool), NULL,  GL_DYNAMIC_COPY);
-		// glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, visibilityBuffer);
-		std::cout<<"error: "<<glGetError()<<"\n";
+		glGenBuffers(1, &visBuffer);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, visBuffer);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, numVertsBytes, NULL, GL_DYNAMIC_COPY);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, visBuffer);
+
+		// Generate an element buffer for the point indices to redraw
+		glGenBuffers(1, &elementBuffer);
+		// glBindBuffer(GL_SHADER_STORAGE_BUFFER, elementBuffer);
+		// glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, elementBuffer);
+
+		std::cout<<"gl error:"<<glGetError()<<"\n";
 	}
 
 	// create an empty VAO for the screenspace quad, which will be created in a shader...
@@ -262,10 +276,10 @@ int main(int argc, char *argv[])
 		glm::mat4 view;
 
 	// count fps
-		#define FPS_INTERVAL 1.0 // seconds.
-		unsigned int fps_lasttime = SDL_GetTicks(); //the last recorded time.
-		unsigned int fps_current = 0; //the current FPS.
-		unsigned int fps_frames = 0; //frames passed since the last recorded fps.
+	#define FPS_INTERVAL 1.0 // seconds.
+	unsigned int fps_lasttime = SDL_GetTicks(); //the last recorded time.
+	unsigned int fps_current = 0; //the current FPS.
+	unsigned int fps_frames = 0; //frames passed since the last recorded fps.
 
 	// bind the id texture to unit 0
 	glActiveTexture(GL_TEXTURE0);
@@ -273,10 +287,15 @@ int main(int argc, char *argv[])
 	// bind the id texture to unit 1
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, depthTexture);
-	// and the texture buffer for the colour to unit 2
+	// texture buffer for the colour to unit 2
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_BUFFER, colTex);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_R8UI, colBuffer);
+
+	auto rng = std::default_random_engine {};
+
+	size_t lastDraw = 0;
+	const size_t fillRate = 10000; // add 100 random elements each frame
+	const GLuint zero = 0;
 
 	bool quit = false;
 	SDL_Event event;
@@ -327,7 +346,7 @@ int main(int argc, char *argv[])
 			fps_lasttime = ticks;
 			fps_current = fps_frames;
 			fps_frames = 0;
-			std::cout<<"fps: "<<fps_current<<"\n";
+			// std::cout<<"fps: "<<fps_current<<"\n";
 		}
 
 		// std::cout<<"gl error:"<<glGetError()<<"\n";
@@ -346,9 +365,80 @@ int main(int argc, char *argv[])
 		view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
+		// prepare our element buffer for drawing
+		size_t numVisible = 0;
+		{
+			// glMemoryBarrier(GL_ALL_BARRIER_BITS);
+			// count our visibility buffer
+			std::vector<GLubyte> buf(numVertsBytes, 0);
+			// glBindBuffer(GL_SHADER_STORAGE_BUFFER, visBuffer);
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, numVertsBytes, buf.data());
+
+			std::vector<GLuint> visibleIndices, fillIndices; //(num_verts, 0);
+			visibleIndices.reserve(num_verts);
+			fillIndices.reserve(num_verts);
+/*
+			for (int i = 0; i < buf.size(); ++i)
+			{
+				GLubyte e = buf[i];
+				while (e)
+				{
+					++numVisible;
+					e &= e - 1;
+				}
+			}
+*/
+			size_t pointIndex = 0;
+			for (size_t i = 0; i < numVertsBytes; ++i)
+			{
+				GLubyte e = buf[i];
+				// 8 bits per ubyte, so we bit shift
+				for (int j = 0; j < 8; ++j, ++pointIndex)
+				{
+					if (e & 1)
+					{
+						visibleIndices.push_back(pointIndex);
+					}
+					else
+					{
+						fillIndices.push_back(pointIndex);
+					}
+
+					e >>= 1;
+				}
+			}
+
+			numVisible = visibleIndices.size();
+
+			std::cout<<numVisible<<" visible points ("<<(float(numVisible) / float(num_verts)) * 100.0f<<"% of total) "<<(float(numVisible) / float(lastDraw)) * 100.0f<<"% of last draw) fps: "<<fps_current<<"\n";
+
+			// if we vertices to shuffle in, shuffle in some of the invisible points
+			if (!fillIndices.empty())
+			{
+				size_t fillCount = std::min(fillRate, fillIndices.size());
+				std::shuffle(std::begin(fillIndices), std::end(fillIndices), rng);
+				for (size_t i = 0; i < fillCount; ++i)
+				{
+					visibleIndices.push_back(fillIndices[i]);
+				}
+				numVisible += fillCount;
+			}
+
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, numVisible * sizeof(GLuint), &visibleIndices[0], GL_DYNAMIC_COPY);
+
+			// clear our visibility buffer
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, visBuffer);
+			glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
+			// glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		}
+
 		// draw points
 		glBindVertexArray(verts_vao);
-		glDrawArrays(GL_POINTS, 0, num_verts);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
+		glDrawElements(GL_POINTS, numVisible, GL_UNSIGNED_INT, 0);
+		// glDrawArrays(GL_POINTS, 0, 5);
+		lastDraw = numVisible;
 
 		// screenspace output pass
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -356,20 +446,16 @@ int main(int argc, char *argv[])
 		glDisable(GL_DEPTH_TEST);
 		outputShader.use();
 
-		// std::cout<<glGetError()<<"\n";
-
 		// screenspace pass
 		glBindVertexArray(emptyVAO);
 
-
-		// glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		// swap window to update opengl
 		SDL_GL_SwapWindow(window);
 	}
 
-	// glDeleteFramebuffers(1, &idFBO);
+	glDeleteFramebuffers(1, &idFBO);
 
 	SDL_DestroyWindow(window);
 	SDL_Quit();

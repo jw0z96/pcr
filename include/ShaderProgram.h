@@ -36,7 +36,7 @@ public:
 				std::cout<<"Error: cannot detach all shaders!\n";
 			}
 
-			for (unsigned int i = 0; i < count; ++i)
+			for (GLsizei i = 0; i < count; ++i)
 			{
 				glDetachShader(m_shaderProgramID, existingShaders[i]);
 			}
@@ -55,7 +55,7 @@ public:
 				shaderStream << shaderFile.rdbuf();
 				shaderFile.close();
 			}
-			catch(std::ifstream::failure e)
+			catch (std::ifstream::failure e)
 			{
 				std::cout << "Error: Whilst reading shader file " << component.source << "\n";
 				return false; // unsuccessful

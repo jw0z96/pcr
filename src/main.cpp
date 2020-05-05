@@ -308,9 +308,11 @@ int main(int argc, char *argv[])
 
 	auto rng = std::default_random_engine {};
 
-	size_t lastDraw = 0;
-	const size_t fillRate = 10000; // add 100 random elements each frame
 	const GLuint zero = 0;
+	unsigned int lastDraw = 0;
+	int fillRate = 10000; // add n random elements each frame
+	const unsigned int maxFillRate = std::min(static_cast<unsigned int>(100000), num_verts); // 100k reasonable maximum?
+	bool doProgressive = true;
 
 	bool quit = false;
 	SDL_Event event;
@@ -365,19 +367,29 @@ int main(int argc, char *argv[])
 			fps_frames = 0;
 		}
 
-		// Start the Dear ImGui frame
+		// Start the ImGui frame
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
 
 		// stats window
-		ImGui::Begin("Stats");
+		ImGui::Begin("Controls");
+		ImGui::Checkbox("Progressive Render", &doProgressive);
+
+		if (doProgressive)
+		{
+			ImGui::Text("Fill Rate (per frame):");
+			ImGui::SliderInt("", &fillRate, 0, maxFillRate);
+		}
+
+		ImGui::Separator();
+
 		ImGui::Text("Framerate: %u fps", fps_current);
+		ImGui::Text("Drawing %u / %u points (%.2f%%)", lastDraw, num_verts, (lastDraw * 100.0f / num_verts));
 		ImGui::End();
 
 		// Rendering
 		ImGui::Render();
-
 
 		// std::cout<<"gl error:"<<glGetError()<<"\n";
 
@@ -395,8 +407,7 @@ int main(int argc, char *argv[])
 		view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-		// prepare our element buffer for drawing
-		size_t numVisible = 0;
+		if (doProgressive)
 		{
 			// glMemoryBarrier(GL_ALL_BARRIER_BITS);
 			// count our visibility buffer
@@ -407,7 +418,7 @@ int main(int argc, char *argv[])
 			std::vector<GLuint> visibleIndices, fillIndices; //(num_verts, 0);
 			visibleIndices.reserve(num_verts);
 			fillIndices.reserve(num_verts);
-/*
+			/*
 			for (int i = 0; i < buf.size(); ++i)
 			{
 				GLubyte e = buf[i];
@@ -417,7 +428,7 @@ int main(int argc, char *argv[])
 					e &= e - 1;
 				}
 			}
-*/
+			*/
 			size_t pointIndex = 0;
 			for (size_t i = 0; i < numVertsBytes; ++i)
 			{
@@ -440,12 +451,10 @@ int main(int argc, char *argv[])
 
 			numVisible = visibleIndices.size();
 
-			std::cout<<numVisible<<" visible points ("<<(float(numVisible) / float(num_verts)) * 100.0f<<"% of total) "<<(float(numVisible) / float(lastDraw)) * 100.0f<<"% of last draw) fps: "<<fps_current<<"\n";
-
 			// if we vertices to shuffle in, shuffle in some of the invisible points
 			if (!fillIndices.empty())
 			{
-				size_t fillCount = std::min(fillRate, fillIndices.size());
+				size_t fillCount = std::min(static_cast<size_t>(fillRate), fillIndices.size());
 				std::shuffle(std::begin(fillIndices), std::end(fillIndices), rng);
 				for (size_t i = 0; i < fillCount; ++i)
 				{
@@ -461,14 +470,21 @@ int main(int argc, char *argv[])
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, visBuffer);
 			glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
 			// glMemoryBarrier(GL_ALL_BARRIER_BITS);
-		}
 
-		// draw points
-		glBindVertexArray(verts_vao);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
-		glDrawElements(GL_POINTS, numVisible, GL_UNSIGNED_INT, 0);
-		// glDrawArrays(GL_POINTS, 0, 5);
-		lastDraw = numVisible;
+			// draw points
+			glBindVertexArray(verts_vao);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
+			glDrawElements(GL_POINTS, numVisible, GL_UNSIGNED_INT, 0);
+			// glDrawArrays(GL_POINTS, 0, 5);
+			lastDraw = numVisible;
+		}
+		else
+		{
+			// draw points
+			glBindVertexArray(verts_vao);
+			glDrawArrays(GL_POINTS, 0, num_verts);
+			lastDraw = num_verts;
+		}
 
 		// screenspace output pass
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);

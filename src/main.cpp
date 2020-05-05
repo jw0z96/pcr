@@ -15,6 +15,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_sdl.h>
+#include <imgui/imgui_impl_opengl3.h>
+
 #include <tinyply/tinyply.h>
 #include "ply_utils.h"
 
@@ -57,32 +61,43 @@ int main(int argc, char *argv[])
 		SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN
 	);
 
+	if (!window)
 	{
-		if (!window)
-		{
-			std::cout<<"Couldn't create window, error: "<<SDL_GetError()<<"\n";
-			return 1;
-		}
+		std::cout<<"Couldn't create window, error: "<<SDL_GetError()<<"\n";
+		return 1;
+	}
 
-		// create OpenGL context
-		if (!SDL_GL_CreateContext(window))
-		{
-			std::cout<<"Couldn't create OpenGL context, error: "<<SDL_GetError()<<"\n";
-			return 1;
-		}
+	// create OpenGL context
+	SDL_GLContext gl_context = SDL_GL_CreateContext(window);
+	if (!gl_context)
+	{
+		std::cout<<"Couldn't create OpenGL context, error: "<<SDL_GetError()<<"\n";
+		return 1;
+	}
 
-		// initialize GLEW
-		glewExperimental = GL_TRUE;
-		GLenum glewError = glewInit();
-		if (glewError != GLEW_OK)
-		{
-			std::cout<<"Error initializing GLEW:"<<glewGetErrorString(glewError)<<"\n";
-			return 1;
-		}
+	// initialize GLEW
+	glewExperimental = GL_TRUE;
+	GLenum glewError = glewInit();
+	if (glewError != GLEW_OK)
+	{
+		std::cout<<"Error initializing GLEW:"<<glewGetErrorString(glewError)<<"\n";
+		return 1;
 	}
 
 	// disable vsync
 	SDL_GL_SetSwapInterval(0);
+
+	// Init imgui
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+
+	// Setup Platform/Renderer bindings
+	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
+	ImGui_ImplOpenGL3_Init("#version 430"); // glsl version
 
 	// set the viewport dimensions
 	glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -303,6 +318,7 @@ int main(int argc, char *argv[])
 	{
 		while (SDL_PollEvent(&event) != 0)
 		{
+			ImGui_ImplSDL2_ProcessEvent(&event);
 			switch (event.type)
 			{
 				// exit if the window is closed
@@ -339,6 +355,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
+		// calculate framerate
 		fps_frames++;
 		const unsigned int & ticks = SDL_GetTicks();
 		if (fps_lasttime < ticks - 1000) // 1000 is the interval? (1000ms, 1sec)
@@ -346,8 +363,21 @@ int main(int argc, char *argv[])
 			fps_lasttime = ticks;
 			fps_current = fps_frames;
 			fps_frames = 0;
-			// std::cout<<"fps: "<<fps_current<<"\n";
 		}
+
+		// Start the Dear ImGui frame
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplSDL2_NewFrame(window);
+		ImGui::NewFrame();
+
+		// stats window
+		ImGui::Begin("Stats");
+		ImGui::Text("Framerate: %u fps", fps_current);
+		ImGui::End();
+
+		// Rendering
+		ImGui::Render();
+
 
 		// std::cout<<"gl error:"<<glGetError()<<"\n";
 
@@ -451,12 +481,20 @@ int main(int argc, char *argv[])
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
 		// swap window to update opengl
 		SDL_GL_SwapWindow(window);
 	}
 
 	glDeleteFramebuffers(1, &idFBO);
 
+	// Cleanup
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplSDL2_Shutdown();
+	ImGui::DestroyContext();
+
+	SDL_GL_DeleteContext(gl_context);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 

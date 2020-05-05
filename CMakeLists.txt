@@ -30,6 +30,23 @@ message(STATUS "GLEW includes from ${GLEW_INCLUDE_DIRS}")
 
 # include everything under 'libs', which contains libraries supplied by the project
 include_directories(libs)
+# whatever trevor
+add_library(imgui STATIC
+	libs/imgui/imconfig.h
+	libs/imgui/imgui.cpp
+	libs/imgui/imgui_demo.cpp
+	libs/imgui/imgui_draw.cpp
+	libs/imgui/imgui.h
+	libs/imgui/imgui_impl_opengl3.cpp
+	libs/imgui/imgui_impl_opengl3.h
+	libs/imgui/imgui_impl_sdl.cpp
+	libs/imgui/imgui_impl_sdl.h
+	libs/imgui/imgui_internal.h
+	libs/imgui/imgui_widgets.cpp
+	libs/imgui/imstb_rectpack.h
+	libs/imgui/imstb_textedit.h
+	libs/imgui/imstb_truetype.h
+)
 
 # link our executable against external libraries
-target_link_libraries(PointCloudRendering ${SDL2_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARY})
+target_link_libraries(PointCloudRendering imgui ${SDL2_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARY})

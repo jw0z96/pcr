@@ -505,6 +505,19 @@ int main(int argc, char *argv[])
 
 	glDeleteFramebuffers(1, &idFBO);
 
+	glDeleteVertexArrays(1, &verts_vao);
+	glDeleteVertexArrays(1, &emptyVAO);
+
+	glDeleteTextures(1, &idTexture);
+	glDeleteTextures(1, &depthTexture);
+	glDeleteTextures(1, &colTex);
+
+	glDeleteBuffers(1, &verts_vbo);
+	glDeleteBuffers(1, &colBuffer);
+	glDeleteBuffers(1, &visBuffer);
+	glDeleteBuffers(1, &elementBuffer);
+	glDeleteBuffers(1, &counterBuffer);
+
 	// Cleanup
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplSDL2_Shutdown();

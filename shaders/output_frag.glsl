@@ -4,7 +4,7 @@ layout(binding = 0) uniform isampler2D idTexture;
 layout(binding = 1) uniform sampler2D depthTexture;
 layout(binding = 2) uniform usamplerBuffer colTexture;
 
-layout(std430, binding = 3) buffer visibilityBuffer
+layout(std430, binding = 0) buffer visibilityBuffer
 {
 	uint visibilities[];
 };

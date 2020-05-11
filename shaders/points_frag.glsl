@@ -1,4 +1,4 @@
-#version 330 core
+#version 430 core
 // #version 430
 
 // layout(std430, binding = 0) buffer pointColourBuffer
@@ -16,6 +16,7 @@ flat in int pointIndex;
 // out vec4 fragColour;
 layout(location = 0) out int fragIndex;
 // out int fragIndex;
+// layout (depth_greater) out float gl_FragDepth;
 
 void main()
 {
@@ -24,7 +25,9 @@ void main()
 	// // // float alpha = 1.0f - smoothstep(1.0f - delta, 1.0f + delta, length(gl_PointCoord - vec2(0.5)));
 	// float alpha = 1.0f - smoothstep(1.0f - delta, 1.0f + delta, dot(cxy, cxy));
 	if (dot(cxy, cxy) > 1.0)
+	{
 		discard;
+	}
 	// fragColour = vec4(col, alpha);
 
 	fragIndex = pointIndex;

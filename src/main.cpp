@@ -24,8 +24,8 @@
 
 #include "ShaderProgram.h"
 
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 640
+#define SCREEN_WIDTH 1024
+#define SCREEN_HEIGHT 1024
 
 int main(int argc, char *argv[])
 {
@@ -164,7 +164,19 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	// compile and use points shader
+	// compile visibility compute shader
+	ShaderProgram visComputeShader;
+	{
+		visComputeShader.addShaderSource(GL_COMPUTE_SHADER, "shaders/visibility_comp.glsl");
+		if (!visComputeShader.compile())
+		{
+			std::cout<<"Error: visComputeShader did not compile!\n";
+			return 1;
+		}
+	}
+	int seedLoc = visComputeShader.getUniformLocation("seed");
+
+	// compile points shader
 	ShaderProgram pointsShader;
 	{
 		pointsShader.addShaderSource(GL_VERTEX_SHADER, "shaders/points_vert.glsl");
@@ -176,7 +188,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	// compile and use output shader
+	// compile output shader
 	ShaderProgram outputShader;
 	{
 		outputShader.addShaderSource(GL_VERTEX_SHADER, "shaders/screenspace_vert.glsl");
@@ -245,11 +257,14 @@ int main(int argc, char *argv[])
 		glGenBuffers(1, &visBuffer);
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, visBuffer);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, numVertsBytes, NULL, GL_DYNAMIC_COPY);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, visBuffer);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, visBuffer);
 
 		// Generate an element buffer for the point indices to redraw
 		glGenBuffers(1, &elementBuffer);
-		// glBindBuffer(GL_SHADER_STORAGE_BUFFER, elementBuffer);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, elementBuffer);
+		// give it enough elements for a full draw
+		glBufferData(GL_SHADER_STORAGE_BUFFER, num_verts * sizeof(GLuint), NULL, GL_DYNAMIC_COPY);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, elementBuffer);
 		// glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, elementBuffer);
 
 		std::cout<<"gl error:"<<glGetError()<<"\n";
@@ -261,34 +276,34 @@ int main(int argc, char *argv[])
 
 	// Camera variables
 	pointsShader.use();
-		const glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 1.0f, 100.0f);
-		GLint projectionLoc = pointsShader.getUniformLocation("projection");
-		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+	const glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 1.0f, 100.0f);
+	GLint projectionLoc = pointsShader.getUniformLocation("projection");
+	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-		int viewLoc = pointsShader.getUniformLocation("view");
+	int viewLoc = pointsShader.getUniformLocation("view");
 
-		/*
-			glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f,  3.0f);
-			glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-			glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f,  0.0f);
+	/*
+		glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f,  3.0f);
+		glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+		glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f,  0.0f);
 
-			glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-
-			const glm::mat4 model = glm::translate(
-				glm::rotate(glm::mat4(1.0), 3.14159f, glm::vec3(1.0f, 0.0f, 0.0f)),
-				glm::vec3(0.0f, 0.0f, -5.0f)
-			);
-		*/
+		glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
 		const glm::mat4 model = glm::translate(
-			glm::rotate(glm::mat4(1.0), 3.14159f/2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
+			glm::rotate(glm::mat4(1.0), 3.14159f, glm::vec3(1.0f, 0.0f, 0.0f)),
 			glm::vec3(0.0f, 0.0f, -5.0f)
 		);
-		// const glm::mat4 model = glm::rotate(glm::mat4(1.0), 3.14159f/2.0f, glm::vec3(-1.0f, 0.0f, 0.0f));
-		glUniformMatrix4fv(pointsShader.getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
+	*/
 
-		const float cameraRadius = 20.0f;
-		glm::mat4 view;
+	const glm::mat4 model = glm::translate(
+		glm::rotate(glm::mat4(1.0), 3.14159f/2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
+		glm::vec3(0.0f, 0.0f, -5.0f)
+	);
+	// const glm::mat4 model = glm::rotate(glm::mat4(1.0), 3.14159f/2.0f, glm::vec3(-1.0f, 0.0f, 0.0f));
+	glUniformMatrix4fv(pointsShader.getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
+
+	const float cameraRadius = 20.0f;
+	glm::mat4 view;
 
 	// count fps
 	#define FPS_INTERVAL 1.0 // seconds.
@@ -306,13 +321,28 @@ int main(int argc, char *argv[])
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_BUFFER, colTex);
 
+	// create an atomic counter, used to when getting the number of visible fragments
+	GLuint counterBuffer;
+	GLuint counterValue = 0;
+	glGenBuffers(1, &counterBuffer);
+	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, counterBuffer);
+	glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &counterValue, GL_DYNAMIC_DRAW);
+	glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, counterBuffer);
+
 	auto rng = std::default_random_engine {};
+
+	// determine workgroup count
+	int work_grp_cnt;
+	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_cnt);
+	int work_grp_size;
+	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size);
 
 	const GLuint zero = 0;
 	unsigned int lastDraw = 0;
 	int fillRate = 10000; // add n random elements each frame
 	const unsigned int maxFillRate = std::min(static_cast<unsigned int>(100000), num_verts); // 100k reasonable maximum?
 	bool doProgressive = true;
+	bool countGPU = false;
 
 	bool quit = false;
 	SDL_Event event;
@@ -378,6 +408,7 @@ int main(int argc, char *argv[])
 
 		if (doProgressive)
 		{
+			ImGui::Checkbox("Compute Element Buffer on GPU", &countGPU);
 			ImGui::Text("Fill Rate (per frame):");
 			ImGui::SliderInt("", &fillRate, 0, maxFillRate);
 		}
@@ -409,73 +440,103 @@ int main(int argc, char *argv[])
 
 		if (doProgressive)
 		{
-			// glMemoryBarrier(GL_ALL_BARRIER_BITS);
-			// count our visibility buffer
-			std::vector<GLubyte> buf(numVertsBytes, 0);
+			size_t numVisible = 0;
+
+			// // prepare our element buffer for drawing
+			// if (countGPU)
+			// {
+				// use a compute shader to count the elements in the visibility buffer
+				visComputeShader.use();
+				// glBindBuffer(GL_SHADER_STORAGE_BUFFER, visBuffer);
+				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, visBuffer);
+				// glBindBuffer(GL_SHADER_STORAGE_BUFFER, elementBuffer);
+				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, elementBuffer);
+				// glUniform1ui(seedLoc, ticks);
+
+				// since we can only access the buffer as unsigned ints, we need to dispatch ceil(numVertsBytes / sizeof(uint)) shader invocations
+				glDispatchCompute(ceil(numVertsBytes / 4), 1, 1);
+
+				// get the counter value
+				glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), &counterValue);
+				numVisible = counterValue;
+				// reset the counter value
+				glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &zero, GL_DYNAMIC_DRAW);
+
+				// // clear our visibility buffer
+				// glBindBuffer(GL_SHADER_STORAGE_BUFFER, visBuffer);
+				// glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
+			// }
+			// else
+			// {
+			// 	// glMemoryBarrier(GL_ALL_BARRIER_BITS);
+			// 	// count our visibility buffer
+			// 	std::vector<GLubyte> buf(numVertsBytes, 0);
+			// 	// glBindBuffer(GL_SHADER_STORAGE_BUFFER, visBuffer);
+			// 	glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, numVertsBytes, buf.data());
+
+			// 	std::vector<GLuint> visibleIndices, fillIndices; //(num_verts, 0);
+			// 	visibleIndices.reserve(num_verts);
+			// 	fillIndices.reserve(num_verts);
+			// 	/*
+			// 	for (int i = 0; i < buf.size(); ++i)
+			// 	{
+			// 		GLubyte e = buf[i];
+			// 		while (e)
+			// 		{
+			// 			++numVisible;
+			// 			e &= e - 1;
+			// 		}
+			// 	}
+			// 	*/
+			// 	size_t pointIndex = 0;
+			// 	for (size_t i = 0; i < numVertsBytes; ++i)
+			// 	{
+			// 		GLubyte e = buf[i];
+			// 		// 8 bits per ubyte, so we bit shift
+			// 		for (int j = 0; j < 8; ++j, ++pointIndex)
+			// 		{
+			// 			if (e & 1)
+			// 			{
+			// 				visibleIndices.push_back(pointIndex);
+			// 			}
+			// 			else
+			// 			{
+			// 				fillIndices.push_back(pointIndex);
+			// 			}
+
+			// 			e >>= 1;
+			// 		}
+			// 	}
+
+			// 	numVisible = visibleIndices.size();
+
+			// 	// if we vertices to shuffle in, shuffle in some of the invisible points
+			// 	if (!fillIndices.empty())
+			// 	{
+			// 		size_t fillCount = std::min(static_cast<size_t>(fillRate), fillIndices.size());
+			// 		std::shuffle(std::begin(fillIndices), std::end(fillIndices), rng);
+			// 		for (size_t i = 0; i < fillCount; ++i)
+			// 		{
+			// 			visibleIndices.push_back(fillIndices[i]);
+			// 		}
+			// 		numVisible += fillCount;
+			// 	}
+
+			// 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
+			// 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, numVisible * sizeof(GLuint), &visibleIndices[0], GL_DYNAMIC_COPY);
+			// }
+
+			// // clear our visibility buffer
 			// glBindBuffer(GL_SHADER_STORAGE_BUFFER, visBuffer);
-			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, numVertsBytes, buf.data());
+			// glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
 
-			std::vector<GLuint> visibleIndices, fillIndices; //(num_verts, 0);
-			visibleIndices.reserve(num_verts);
-			fillIndices.reserve(num_verts);
-			/*
-			for (int i = 0; i < buf.size(); ++i)
-			{
-				GLubyte e = buf[i];
-				while (e)
-				{
-					++numVisible;
-					e &= e - 1;
-				}
-			}
-			*/
-			size_t pointIndex = 0;
-			for (size_t i = 0; i < numVertsBytes; ++i)
-			{
-				GLubyte e = buf[i];
-				// 8 bits per ubyte, so we bit shift
-				for (int j = 0; j < 8; ++j, ++pointIndex)
-				{
-					if (e & 1)
-					{
-						visibleIndices.push_back(pointIndex);
-					}
-					else
-					{
-						fillIndices.push_back(pointIndex);
-					}
-
-					e >>= 1;
-				}
-			}
-
-			numVisible = visibleIndices.size();
-
-			// if we vertices to shuffle in, shuffle in some of the invisible points
-			if (!fillIndices.empty())
-			{
-				size_t fillCount = std::min(static_cast<size_t>(fillRate), fillIndices.size());
-				std::shuffle(std::begin(fillIndices), std::end(fillIndices), rng);
-				for (size_t i = 0; i < fillCount; ++i)
-				{
-					visibleIndices.push_back(fillIndices[i]);
-				}
-				numVisible += fillCount;
-			}
-
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, numVisible * sizeof(GLuint), &visibleIndices[0], GL_DYNAMIC_COPY);
-
-			// clear our visibility buffer
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, visBuffer);
-			glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
-			// glMemoryBarrier(GL_ALL_BARRIER_BITS);
+			pointsShader.use(); // oops
 
 			// draw points
 			glBindVertexArray(verts_vao);
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
 			glDrawElements(GL_POINTS, numVisible, GL_UNSIGNED_INT, 0);
-			// glDrawArrays(GL_POINTS, 0, 5);
+
 			lastDraw = numVisible;
 		}
 		else

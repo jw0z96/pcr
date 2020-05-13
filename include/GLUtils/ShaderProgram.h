@@ -1,9 +1,8 @@
 #pragma once
 
 #include <GL/glew.h>
-
-#include <string>
 #include <list>
+#include <string>
 #include <unordered_map>
 
 // This just wraps the OpenGL Shader & ShaderProgram creation methods,
@@ -12,17 +11,16 @@
 
 namespace GLUtils
 {
-
 class ShaderProgram
 {
 public:
 	struct ShaderComponent
 	{
 		const GLenum type;
-		const char * source;
+		const char* source;
 	};
 
-	ShaderProgram(const std::list<ShaderComponent> & components);
+	ShaderProgram(const std::list<ShaderComponent>& components);
 
 	inline ~ShaderProgram() { glDeleteProgram(m_shaderProgramID); }
 
@@ -30,10 +28,9 @@ public:
 	inline void use() const { glUseProgram(m_shaderProgramID); }
 
 	// Make sure you use this shader program before using the returned value in glUniform...
-	GLint getUniformLocation(const char * uniformName);
+	GLint getUniformLocation(const char* uniformName);
 
 private:
-
 	// Cache uniform locations
 	std::unordered_map<std::string, GLint> m_uniformLocationCache;
 
@@ -41,4 +38,4 @@ private:
 	const GLuint m_shaderProgramID;
 };
 
-}
+} // namespace GLUtils

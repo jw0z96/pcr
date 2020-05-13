@@ -1,85 +1,88 @@
 #include "GLUtils/ShaderProgram.h"
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 #include <vector>
 
 namespace
 {
-	// not really necessary
-	bool compileShaderSource(const GLuint & programID, GLenum shaderType, const char * shaderPath)
+// not really necessary
+bool compileShaderSource(const GLuint& programID, GLenum shaderType, const char* shaderPath)
+{
+	// ensure ifstream objects can throw exceptions:
+	std::ifstream shaderFile;
+	shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+	// std::stringstream shaderStream;
+	std::string shaderStr;
+	try
 	{
-		// ensure ifstream objects can throw exceptions:
-		std::ifstream shaderFile;
-		shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-		std::stringstream shaderStream;
-		try
-		{
-			shaderFile.open(shaderPath);
-			shaderStream << shaderFile.rdbuf();
-			shaderFile.close();
-		}
-		catch (const std::ifstream::failure & e)
-		{
-			shaderFile.close();
-			std::cout << "Error: Whilst reading shader file " << shaderPath << "\n";
-			return false; // unsuccessful
-		}
+		shaderFile.open(shaderPath);
+		// shaderStream << shaderFile.rdbuf();
 
-		const std::string streamStr = shaderStream.str(); // ugh
-		const char * sourceStr = streamStr.c_str(); // ugh
+		shaderStr.assign((std::istreambuf_iterator<char>(shaderFile)), (std::istreambuf_iterator<char>()));
 
-		const GLuint shader = glCreateShader(shaderType);
-		glShaderSource(shader, 1, &sourceStr, NULL);
-		glCompileShader(shader);
-
-		int shaderSuccess;
-		glGetShaderiv(shader, GL_COMPILE_STATUS, &shaderSuccess);
-		if (!shaderSuccess)
-		{
-			char log[512];
-			glGetShaderInfoLog(shader, 512, NULL, log);
-			std::cout << "Error: compiling shader component of type " << shaderType << ": " << log << "\n";
-			glDeleteShader(shader);
-			return false; // unsuccessful
-		}
-
-		// attach the shader to the shader program, and then delete it,
-		// since it will be kept alive by the program
-		glAttachShader(programID, shader);
-		glDeleteShader(shader);
-		return true;
+		shaderFile.close();
+	}
+	catch (const std::ifstream::failure& e)
+	{
+		shaderFile.close();
+		std::cout << "Error: Whilst reading shader file " << shaderPath << "\n";
+		return false; // unsuccessful
 	}
 
-	void cacheUniformLocations(const GLuint & programID, std::unordered_map<std::string, GLint> & cache)
+	const GLuint shader = glCreateShader(shaderType);
+	const char* shaderCStr = shaderStr.c_str(); // ugh
+	glShaderSource(shader, 1, &shaderCStr, NULL);
+	glCompileShader(shader);
+
+	int shaderSuccess;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &shaderSuccess);
+	if (!shaderSuccess)
 	{
-		GLint maxUniformNameLen, numUniforms;
-		glGetProgramiv(programID, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxUniformNameLen );
-		glGetProgramiv(programID, GL_ACTIVE_UNIFORMS, &numUniforms );
+		char log[512];
+		glGetShaderInfoLog(shader, 512, NULL, log);
+		std::cout << "Error: compiling shader component of type " << shaderType << ": " << log << "\n";
+		glDeleteShader(shader);
+		return false; // unsuccessful
+	}
 
-		GLint read, size;
-		GLenum type;
+	// attach the shader to the shader program, and then delete it,
+	// since it will be kept alive by the program
+	glAttachShader(programID, shader);
+	glDeleteShader(shader);
+	return true;
+}
 
-		std::vector<GLchar> uniformName(maxUniformNameLen, 0);
-		for ( GLint i = 0; i < numUniforms; ++ i )
-		{
-			glGetActiveUniform(programID, i, maxUniformNameLen, &read, &size, &type, uniformName.data());
-			cache[uniformName.data()] = glGetUniformLocation(programID, uniformName.data());
-		}
+void cacheUniformLocations(const GLuint& programID, std::unordered_map<std::string, GLint>& cache)
+{
+	GLint maxUniformNameLen, numUniforms;
+	glGetProgramiv(programID, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxUniformNameLen);
+	glGetProgramiv(programID, GL_ACTIVE_UNIFORMS, &numUniforms);
+
+	GLint read, size;
+	GLenum type;
+
+	std::vector<GLchar> uniformName(maxUniformNameLen, 0);
+	for (GLint i = 0; i < numUniforms; ++i)
+	{
+		glGetActiveUniform(programID, i, maxUniformNameLen, &read, &size, &type, uniformName.data());
+		cache[uniformName.data()] = glGetUniformLocation(programID, uniformName.data());
 	}
 }
+} // namespace
 
 using namespace GLUtils;
 
-ShaderProgram::ShaderProgram(const std::list<ShaderComponent> & components) : m_shaderProgramID(glCreateProgram())
+ShaderProgram::ShaderProgram(const std::list<ShaderComponent>& components) :
+	m_shaderProgramID(glCreateProgram())
 {
-	for (const ShaderComponent & component : components)
+	for (const ShaderComponent& component : components)
 	{
 		if (!compileShaderSource(m_shaderProgramID, component.type, component.source))
 		{
 			// break here, don't bother linking?
-			std::cout<<"Error: compiling shader: "<<component.source<<"\n";
+			std::cout << "Error: compiling shader: " << component.source << "\n";
 			return;
 		}
 	}
@@ -89,7 +92,7 @@ ShaderProgram::ShaderProgram(const std::list<ShaderComponent> & components) : m_
 
 	int programSuccess;
 	glGetProgramiv(m_shaderProgramID, GL_LINK_STATUS, &programSuccess);
-	if(!programSuccess)
+	if (!programSuccess)
 	{
 		char log[512];
 		glGetProgramInfoLog(m_shaderProgramID, 512, NULL, log);
@@ -101,7 +104,7 @@ ShaderProgram::ShaderProgram(const std::list<ShaderComponent> & components) : m_
 	cacheUniformLocations(m_shaderProgramID, m_uniformLocationCache);
 }
 
-GLint ShaderProgram::getUniformLocation(const char * uniformName)
+GLint ShaderProgram::getUniformLocation(const char* uniformName)
 {
 	// TODO: Check if shader is valid?
 

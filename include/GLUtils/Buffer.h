@@ -8,35 +8,21 @@
 
 namespace GLUtils
 {
-
 class Buffer
 {
 public:
+	Buffer() : m_id(0) { glGenBuffers(1, &m_id); }
 
-	Buffer() : m_id(0)
-	{
-		glGenBuffers(1, &m_id);
-	}
+	~Buffer() { glDeleteBuffers(1, &m_id); }
 
-	~Buffer()
-	{
-		glDeleteBuffers(1, &m_id);
-	}
-
-	inline void bindAs(const GLenum &type) const
-	{
-		glBindBuffer(type, m_id);
-	}
+	inline void bindAs(const GLenum &type) const { glBindBuffer(type, m_id); }
 
 	inline void bindAsIndexed(const GLenum &type, const GLuint &index) const
 	{
 		glBindBufferBase(type, index, m_id);
 	}
 
-	static inline void unbind(const GLenum &type)
-	{
-		glBindBuffer(type, 0);
-	}
+	static inline void unbind(const GLenum &type) { glBindBuffer(type, 0); }
 
 	// uh... expects a bound GL_TEXTURE_BUFFER texture object
 	inline void attachToTextureBuffer(const GLenum &format) const
@@ -54,9 +40,8 @@ public:
 	}
 
 private:
-
 	// Buffer ID
 	GLuint m_id;
 };
 
-}
+} // namespace GLUtils

@@ -9,11 +9,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(CMAKE_CXX_FLAGS "-O3 -Wall -Wextra")
 
-# executable
-add_executable(PointCloudRendering src/main.cpp)
-
 # include everything under 'include'
 include_directories(include)
+
+# recursively get cpp files
+file(GLOB_RECURSE sources CONFIGURE_DEPENDS src/*.cpp)
+
+# executable
+add_executable(PointCloudRendering ${sources})
 
 # find SDL2 libraries from the system
 find_package(SDL2 REQUIRED)

@@ -24,11 +24,10 @@ public:
 
 	inline ~ShaderProgram() { glDeleteProgram(m_shaderProgramID); }
 
-	// TODO: Check if shader is valid?
-	inline void use() const { glUseProgram(m_shaderProgramID); }
+	void use() const;
 
 	// Make sure you use this shader program before using the returned value in glUniform...
-	GLint getUniformLocation(const char* uniformName);
+	GLint getUniformLocation(const char* uniformName) const;
 
 private:
 	// Cache uniform locations
@@ -36,6 +35,9 @@ private:
 
 	// Shader program ID
 	const GLuint m_shaderProgramID;
+
+	// Track whether the shader is valid
+	bool m_isValid;
 };
 
 } // namespace GLUtils

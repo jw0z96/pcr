@@ -27,14 +27,13 @@ public:
 	// uh... expects a bound GL_TEXTURE_BUFFER texture object
 	inline void attachToTextureBuffer(const GLenum &format) const
 	{
-		/*
 		GLint tex = 0;
 		glGetIntegerv(GL_TEXTURE_BINDING_BUFFER, &tex);
 		if (!tex)
 		{
 			// TODO: Throw an error
+			return;
 		}
-		*/
 
 		glTexBuffer(GL_TEXTURE_BUFFER, format, m_id);
 	}

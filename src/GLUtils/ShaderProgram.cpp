@@ -7,21 +7,16 @@
 
 namespace
 {
-// not really necessary
 bool compileShaderSource(const GLuint& programID, GLenum shaderType, const char* shaderPath)
 {
 	// ensure ifstream objects can throw exceptions:
 	std::ifstream shaderFile;
 	shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-	// std::stringstream shaderStream;
 	std::string shaderStr;
 	try
 	{
 		shaderFile.open(shaderPath);
-		// shaderStream << shaderFile.rdbuf();
-
 		shaderStr.assign((std::istreambuf_iterator<char>(shaderFile)), (std::istreambuf_iterator<char>()));
-
 		shaderFile.close();
 	}
 	catch (const std::ifstream::failure& e)
@@ -53,29 +48,12 @@ bool compileShaderSource(const GLuint& programID, GLenum shaderType, const char*
 	glDeleteShader(shader);
 	return true;
 }
-
-void cacheUniformLocations(const GLuint& programID, std::unordered_map<std::string, GLint>& cache)
-{
-	GLint maxUniformNameLen, numUniforms;
-	glGetProgramiv(programID, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxUniformNameLen);
-	glGetProgramiv(programID, GL_ACTIVE_UNIFORMS, &numUniforms);
-
-	GLint read, size;
-	GLenum type;
-
-	std::vector<GLchar> uniformName(maxUniformNameLen, 0);
-	for (GLint i = 0; i < numUniforms; ++i)
-	{
-		glGetActiveUniform(programID, i, maxUniformNameLen, &read, &size, &type, uniformName.data());
-		cache[uniformName.data()] = glGetUniformLocation(programID, uniformName.data());
-	}
-}
 } // namespace
 
 using namespace GLUtils;
 
 ShaderProgram::ShaderProgram(const std::list<ShaderComponent>& components) :
-	m_shaderProgramID(glCreateProgram())
+	m_shaderProgramID(glCreateProgram()), m_isValid(false)
 {
 	for (const ShaderComponent& component : components)
 	{
@@ -100,21 +78,49 @@ ShaderProgram::ShaderProgram(const std::list<ShaderComponent>& components) :
 		return;
 	}
 
+	m_isValid = true;
+
 	// if linking was successful, we can cache all of the uniform locations
-	cacheUniformLocations(m_shaderProgramID, m_uniformLocationCache);
+	GLint maxUniformNameLen, numUniforms;
+	glGetProgramiv(m_shaderProgramID, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxUniformNameLen);
+	glGetProgramiv(m_shaderProgramID, GL_ACTIVE_UNIFORMS, &numUniforms);
+
+	GLint read, size;
+	GLenum type;
+
+	std::vector<GLchar> uniformName(maxUniformNameLen, 0);
+	for (GLint i = 0; i < numUniforms; ++i)
+	{
+		glGetActiveUniform(m_shaderProgramID, i, maxUniformNameLen, &read, &size, &type, uniformName.data());
+		std::cout << "Shader[" << m_shaderProgramID << "] uniform[" << i << "] name["
+				  << std::string(uniformName.data()) << "] location["
+				  << glGetUniformLocation(m_shaderProgramID, uniformName.data()) << "]\n";
+		m_uniformLocationCache[uniformName.data()] =
+			glGetUniformLocation(m_shaderProgramID, uniformName.data());
+	}
 }
 
-GLint ShaderProgram::getUniformLocation(const char* uniformName)
+void ShaderProgram::use() const
 {
-	// TODO: Check if shader is valid?
-
-	std::unordered_map<std::string, GLint>::const_iterator it = m_uniformLocationCache.find(uniformName);
-	if (it != m_uniformLocationCache.end())
+	if (!m_isValid)
 	{
-		return it->second;
+		// TODO: Throw something here...
+		return;
 	}
 
-	const GLint location = glGetUniformLocation(m_shaderProgramID, uniformName);
-	m_uniformLocationCache[uniformName] = location;
-	return location;
+	glUseProgram(m_shaderProgramID);
+}
+
+GLint ShaderProgram::getUniformLocation(const char* uniformName) const
+{
+	if (!m_isValid)
+	{
+		// TODO: Throw something here...
+		return -1; // -1 is the same as invalid location
+	}
+
+	// m_uniformLocationCache should have found all valid locations, so just return -1 invalid location) if
+	// not found
+	std::unordered_map<std::string, GLint>::const_iterator it = m_uniformLocationCache.find(uniformName);
+	return it != m_uniformLocationCache.end() ? it->second : -1;
 }

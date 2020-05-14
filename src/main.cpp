@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
 			{GL_COMPUTE_SHADER, "shaders/visibility_comp.glsl"}
 		});
 
-		int seedLoc = visComputeShader.getUniformLocation("seed");
+		// int seedLoc = visComputeShader.getUniformLocation("seed");
 
 		// Create points shader
 		GLUtils::ShaderProgram pointsShader({

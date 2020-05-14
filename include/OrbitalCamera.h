@@ -4,103 +4,82 @@
 
 #include <glm/glm.hpp>
 
-// #include <cmath>
+// This just combines the code for calculating the view and projection matrices, but really they're independent of each other
 
 class OrbitalCamera
 {
 public:
-	OrbitalCamera() :
-		m_theta(0.0f), m_phi(0.0f), m_target(0.0f), m_distance(20.0f), m_viewMat(1.0f), m_fov(45.0f), m_aspect(1.0f),
-		m_nearClip(1.0f), m_farClip(100.0f), m_projectionMat(1.0f)
-	{
-		updateView();
-		updateProjection();
-	}
+	OrbitalCamera();
 
-	// ~OrbitalCamera();
+	// ~OrbitalCamera(); // let the compiler do this
+
+	void processInput(const SDL_Event& event);
 
 	// View Matrix methods
+	inline void setCenter(const glm::vec3& target) { m_target = target; }
 
-	void processInput(const SDL_Event& event)
-	{
-		// this is ugly
-		switch (event.type)
-		{
-			case SDL_MOUSEMOTION:
-			{
-				if (event.motion.state & SDL_BUTTON_LMASK)
-				{
-					m_theta -= event.motion.xrel * 0.001f;
-					m_theta = glm::mod(m_theta, 2.0f * glm::pi<double>());
+	// distance from target, a 'dolly' of sorts
+	inline void setDistance(float distance) { m_distance = distance; }
 
-					m_phi += event.motion.yrel * 0.001f;
-					m_phi = glm::clamp(m_phi, -0.5 * glm::pi<double>(), 0.5 * glm::pi<double>());
-
-					// std::cout<<"m_theta: "<<m_theta<<", m_phi: "<<m_phi<<"\n";
-					updateView();
-				}
-			}
-			break;
-			case SDL_MOUSEWHEEL:
-			{
-				m_distance = glm::clamp(m_distance - event.wheel.y, m_nearClip, m_farClip); // lazy
-				updateView();
-			}
-			default: break;
-		}
-	}
-
-	void setCenter(const glm::vec3& target) { m_target = target; }
-
-	// distance from target
-	void setDistance(float distance) { m_distance = distance; }
-
-	glm::mat4 getView() const { return m_viewMat; }
+	inline glm::mat4 getView() const { return m_viewMat; }
 
 	// Projection Matrix methods
-
-	// degrees
-	void setFOV(float fov) { m_fov = fov; }
+	// FOV angle in degrees
+	inline void setFOV(float fov) { m_fov = fov; }
 
 	// Make sure to call this when the aspect ratio of the window changes
-	void setAspect(float aspect) { m_aspect = aspect; }
-	// void setAspect(float width, float height) { m_aspect = width / height; }
+	inline void setAspect(float aspect) { m_aspect = aspect; }
+	inline void setAspect(float width, float height) { m_aspect = width / height; }
 
-	void setNearFarClip(float near, float far)
+	inline void setNearFarClip(float near, float far)
 	{
 		m_nearClip = near;
 		m_farClip = far;
 	}
 
-	glm::mat4 getProjection() const { return m_projectionMat; }
+	inline glm::mat4 getProjection() const { return m_projectionMat; }
 
 private:
-	void updateView()
-	{
-		glm::vec3 point;
-		point.x = glm::sin(m_theta) * glm::cos(m_phi);
-		point.y = glm::sin(m_phi);
-		point.z = glm::cos(m_theta) * glm::cos(m_phi);
+	// Recalculate the view matrix
+	void updateView();
 
-		point *= m_distance;
-		m_viewMat = glm::lookAt(point, m_target, glm::vec3(0.0, 1.0, 0.0));
-	}
+	// Recalculate the projection matrix
+	void updateProjection();
 
-	void updateProjection()
-	{
-		m_projectionMat = glm::perspective(glm::radians(m_fov), m_aspect, m_nearClip, m_farClip);
-	}
+	// View Matrix variables
+	// world up-vector used when calculating the view matrix
+	static const glm::vec3 s_worldUp;
 
-	// static const glm::vec3 s_worldUp;
+	// mouse sensitivity multiplier for the camera rotation control
+	static const float s_mouseSensitivity;
+
+	// scroll sensitivity multiplier for the camera distance control
+	static const float s_scrollSensitivity;
 
 	// theta being the azimuthal angle, phi being altitude/elevation angle, in radians
 	// see: https://i.stack.imgur.com/xA6Im.png (Y/Z swapped)
+	// used for calculating the view point on a unit sphere
 	double m_theta, m_phi;
 
+	// center of the orbital camera
 	glm::vec3 m_target;
+
+	// distance from m_target
 	float m_distance;
+
+	// the actual view matrix...
 	glm::mat4 m_viewMat;
 
-	float m_fov, m_aspect, m_nearClip, m_farClip;
+	// Projection Matrix variables
+	// projection FOV angle in degrees
+	float m_fov;
+
+	// projection aspect ratio
+	float m_aspect;
+
+	// projection near and far clipping distances
+	float m_nearClip, m_farClip;
+
+	// the actual projection matrix...
 	glm::mat4 m_projectionMat;
 };

@@ -7,47 +7,48 @@
 
 namespace
 {
-bool compileShaderSource(const GLuint& programID, GLenum shaderType, const char* shaderPath)
-{
-	// ensure ifstream objects can throw exceptions:
-	std::ifstream shaderFile;
-	shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-	std::string shaderStr;
-	try
+	bool compileShaderSource(const GLuint& programID, GLenum shaderType, const char* shaderPath)
 	{
-		shaderFile.open(shaderPath);
-		shaderStr.assign((std::istreambuf_iterator<char>(shaderFile)), (std::istreambuf_iterator<char>()));
-		shaderFile.close();
-	}
-	catch (const std::ifstream::failure& e)
-	{
-		shaderFile.close();
-		std::cout << "Error: Whilst reading shader file " << shaderPath << "\n";
-		return false; // unsuccessful
-	}
+		// ensure ifstream objects can throw exceptions:
+		std::ifstream shaderFile;
+		shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+		std::string shaderStr;
+		try
+		{
+			shaderFile.open(shaderPath);
+			shaderStr.assign(
+				(std::istreambuf_iterator<char>(shaderFile)), (std::istreambuf_iterator<char>()));
+			shaderFile.close();
+		}
+		catch (const std::ifstream::failure& e)
+		{
+			shaderFile.close();
+			std::cout << "Error: Whilst reading shader file " << shaderPath << "\n";
+			return false; // unsuccessful
+		}
 
-	const GLuint shader = glCreateShader(shaderType);
-	const char* shaderCStr = shaderStr.c_str(); // ugh
-	glShaderSource(shader, 1, &shaderCStr, NULL);
-	glCompileShader(shader);
+		const GLuint shader = glCreateShader(shaderType);
+		const char* shaderCStr = shaderStr.c_str(); // ugh
+		glShaderSource(shader, 1, &shaderCStr, NULL);
+		glCompileShader(shader);
 
-	int shaderSuccess;
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &shaderSuccess);
-	if (!shaderSuccess)
-	{
-		char log[512];
-		glGetShaderInfoLog(shader, 512, NULL, log);
-		std::cout << "Error: compiling shader component of type " << shaderType << ": " << log << "\n";
+		int shaderSuccess;
+		glGetShaderiv(shader, GL_COMPILE_STATUS, &shaderSuccess);
+		if (!shaderSuccess)
+		{
+			char log[512];
+			glGetShaderInfoLog(shader, 512, NULL, log);
+			std::cout << "Error: compiling shader component of type " << shaderType << ": " << log << "\n";
+			glDeleteShader(shader);
+			return false; // unsuccessful
+		}
+
+		// attach the shader to the shader program, and then delete it,
+		// since it will be kept alive by the program
+		glAttachShader(programID, shader);
 		glDeleteShader(shader);
-		return false; // unsuccessful
+		return true;
 	}
-
-	// attach the shader to the shader program, and then delete it,
-	// since it will be kept alive by the program
-	glAttachShader(programID, shader);
-	glDeleteShader(shader);
-	return true;
-}
 } // namespace
 
 using namespace GLUtils;

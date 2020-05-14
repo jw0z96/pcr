@@ -22,6 +22,8 @@
 #include <tinyply/tinyply.h>
 #include "ply_utils.h"
 
+#include "OrbitalCamera.h"
+
 #include "GLUtils/Buffer.h"
 #include "GLUtils/ShaderProgram.h"
 
@@ -238,12 +240,11 @@ int main(int argc, char *argv[])
 		}
 
 		// Camera variables
+		OrbitalCamera camera;
 		pointsShader.use();
-		const glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 1.0f, 100.0f);
-		GLint projectionLoc = pointsShader.getUniformLocation("projection");
-		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+		glUniformMatrix4fv(pointsShader.getUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(camera.getProjection()));
 
-		int viewLoc = pointsShader.getUniformLocation("view");
+		// const GLint viewLoc = pointsShader.getUniformLocation("view");
 
 		// roughly center the richmond-azaelias.ply model
 		const glm::mat4 model = glm::translate(
@@ -253,8 +254,8 @@ int main(int argc, char *argv[])
 
 		glUniformMatrix4fv(pointsShader.getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(model));
 
-		const float cameraRadius = 20.0f;
-		glm::mat4 view;
+		// const float cameraRadius = 20.0f;
+		// glm::mat4 view;
 
 		// count fps
 		#define FPS_INTERVAL 1.0 // seconds.
@@ -305,6 +306,7 @@ int main(int argc, char *argv[])
 			while (SDL_PollEvent(&event) != 0)
 			{
 				ImGui_ImplSDL2_ProcessEvent(&event);
+				camera.processInput(event);
 				switch (event.type)
 				{
 					// exit if the window is closed
@@ -359,11 +361,11 @@ int main(int argc, char *argv[])
 			pointsShader.use();
 
 			// updated uniform with new view matrix
-			const float time = ticks * 0.0001f;
-			const float camX = sin(time) * cameraRadius;
-			const float camZ = cos(time) * cameraRadius;
-			view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
-			glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+			// const float time = ticks * 0.0001f;
+			// const float camX = sin(time) * cameraRadius;
+			// const float camZ = cos(time) * cameraRadius;
+			// view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+			glUniformMatrix4fv(pointsShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(camera.getView()));
 
 			if (doProgressive)
 			{

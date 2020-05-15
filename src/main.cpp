@@ -27,6 +27,8 @@
 #include "GLUtils/Buffer.h"
 #include "GLUtils/ShaderProgram.h"
 
+#include <Remotery/Remotery.h>
+
 #define SCREEN_WIDTH 1024
 #define SCREEN_HEIGHT 1024
 
@@ -100,7 +102,13 @@ int main(int argc, char *argv[])
 
 	// Setup Platform/Renderer bindings
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
-	ImGui_ImplOpenGL3_Init("#version 430"); // glsl version
+	ImGui_ImplOpenGL3_Init("#version 420"); // glsl version
+
+	// Init Remotery
+	Remotery* rmt;
+	rmt_CreateGlobalInstance(&rmt);
+	rmt_BindOpenGL();
+
 
 	// Scope to ensure ShaderProgram and GLBuffer destructors are called before window/context destructors
 	{
@@ -302,203 +310,254 @@ int main(int argc, char *argv[])
 		SDL_Event event;
 		while (!quit)
 		{
+			rmt_ScopedCPUSample(FrameTotal, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+			rmt_ScopedOpenGLSample(FrameTotal_GL);
+
 			// event handling
-			while (SDL_PollEvent(&event) != 0)
 			{
-				ImGui_ImplSDL2_ProcessEvent(&event);
-				camera.processInput(event);
-				switch (event.type)
+				rmt_ScopedCPUSample(EventHandling, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+				rmt_ScopedOpenGLSample(EventHandling_GL);
+
+				while (SDL_PollEvent(&event) != 0)
 				{
-					// exit if the window is closed
-					case SDL_QUIT:
-						quit = true;
-						break;
-					// check for keypresses
-					case SDL_KEYDOWN:
-						if (event.key.keysym.sym == SDLK_r)
-						{
-							// outputShader.compile();
-							// pointsShader.compile();
-							// pointsShader.use();
-							// uhh
-							// update the location of the 'view' uniform location
-							// viewLoc = pointsShader.getUniformLocation("view");
-							// update the values in the the projection and model uniforms
-							// glUniformMatrix4fv(
-							// 	pointsShader.getUniformLocation("projection"),
-							// 	1,
-							// 	GL_FALSE,
-							// 	glm::value_ptr(projection)
-							// );
-							// glUniformMatrix4fv(
-							// 	pointsShader.getUniformLocation("model"),
-							// 	1,
-							// 	GL_FALSE,
-							// 	glm::value_ptr(model)
-							// );
-						}
-						break;
-					default:
-						break;
+					ImGui_ImplSDL2_ProcessEvent(&event);
+					{
+						// rmt_ScopedCPUSample(CameraEvent, RMTSF_None)
+						camera.processInput(event);
+					}
+					switch (event.type)
+					{
+						// exit if the window is closed
+						case SDL_QUIT:
+							quit = true;
+							break;
+						// check for keypresses
+						case SDL_KEYDOWN:
+							if (event.key.keysym.sym == SDLK_r)
+							{
+								// outputShader.compile();
+								// pointsShader.compile();
+								// pointsShader.use();
+								// uhh
+								// update the location of the 'view' uniform location
+								// viewLoc = pointsShader.getUniformLocation("view");
+								// update the values in the the projection and model uniforms
+								// glUniformMatrix4fv(
+								// 	pointsShader.getUniformLocation("projection"),
+								// 	1,
+								// 	GL_FALSE,
+								// 	glm::value_ptr(projection)
+								// );
+								// glUniformMatrix4fv(
+								// 	pointsShader.getUniformLocation("model"),
+								// 	1,
+								// 	GL_FALSE,
+								// 	glm::value_ptr(model)
+								// );
+							}
+							break;
+						default:
+							break;
+					}
+				}
+
+				// calculate framerate
+				fps_frames++;
+				const unsigned int & ticks = SDL_GetTicks();
+				if (fps_lasttime < ticks - 1000) // 1000 is the interval? (1000ms, 1sec)
+				{
+					fps_lasttime = ticks;
+					fps_current = fps_frames;
+					fps_frames = 0;
 				}
 			}
 
-			// calculate framerate
-			fps_frames++;
-			const unsigned int & ticks = SDL_GetTicks();
-			if (fps_lasttime < ticks - 1000) // 1000 is the interval? (1000ms, 1sec)
+
 			{
-				fps_lasttime = ticks;
-				fps_current = fps_frames;
-				fps_frames = 0;
-			}
+				rmt_ScopedCPUSample(IDPass, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+				rmt_ScopedOpenGLSample(IDPass_GL);
 
-			// ID pass
-			glBindFramebuffer(GL_FRAMEBUFFER, idFBO);
-			glEnable(GL_DEPTH_TEST);
-			// glDepthMask(GL_TRUE);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			pointsShader.use();
-
-			// updated uniform with new view matrix
-			// const float time = ticks * 0.0001f;
-			// const float camX = sin(time) * cameraRadius;
-			// const float camZ = cos(time) * cameraRadius;
-			// view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
-			glUniformMatrix4fv(pointsShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(camera.getView()));
-
-			if (doProgressive)
-			{
-				// prepare our element buffer for drawing
-				// prepare the 'count' argument for glDrawElements
-				size_t numVisible = 0;
-				#define EBO_GPU true
-				#if EBO_GPU
-					// use a compute shader to count the elements in the visibility buffer
-					visComputeShader.use();
-					// this should already be set
-					visBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 0);
-					elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
-					// since we can only access the buffer as unsigned ints, we need to dispatch ceil(numVertsBytes / sizeof(uint)) shader invocations
-					glDispatchCompute(ceil(numVertsBytes / 4), 1, 1);
-					// get the atomic counter value
-					glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), &numVisible);
-					// reset the counter value
-					glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &zero, GL_DYNAMIC_DRAW);
-					// TODO: Filling random undrawn indices
-				#else // CPU
-					// count our visibility buffer
-					std::vector<GLubyte> buf(numVertsBytes, 0);
-					visBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
-					glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, numVertsBytes, buf.data());
-					std::vector<GLuint> visibleIndices, fillIndices;
-					visibleIndices.reserve(num_verts);
-					fillIndices.reserve(num_verts);
-					/*
-					for (int i = 0; i < buf.size(); ++i)
-					{
-						GLubyte e = buf[i];
-						while (e)
-						{
-							++numVisible;
-							e &= e - 1;
-						}
-					}
-					*/
-					size_t pointIndex = 0;
-					for (size_t i = 0; i < numVertsBytes; ++i)
-					{
-						GLubyte e = buf[i];
-						// 8 bits per ubyte, so we bit shift
-						for (int j = 0; j < 8; ++j, ++pointIndex)
-						{
-							if (e & 1)
-							{
-								visibleIndices.push_back(pointIndex);
-							}
-							else
-							{
-								fillIndices.push_back(pointIndex);
-							}
-
-							e >>= 1;
-						}
-					}
-
-					numVisible = visibleIndices.size();
-
-					// if we vertices to shuffle in, shuffle in some of the invisible points
-					if (!fillIndices.empty())
-					{
-						size_t fillCount = std::min(static_cast<size_t>(fillRate), fillIndices.size());
-						std::shuffle(std::begin(fillIndices), std::end(fillIndices), rng);
-						for (size_t i = 0; i < fillCount; ++i)
-						{
-							visibleIndices.push_back(fillIndices[i]);
-						}
-						numVisible += fillCount;
-					}
-
-					// elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
-					glBufferData(GL_ELEMENT_ARRAY_BUFFER, numVisible * sizeof(GLuint), &visibleIndices[0], GL_DYNAMIC_COPY);
-
-					// clear our visibility buffer
-					glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
-				#endif
-
-				// draw points
+				// ID pass
+				glBindFramebuffer(GL_FRAMEBUFFER, idFBO);
+				glEnable(GL_DEPTH_TEST);
+				// glDepthMask(GL_TRUE);
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 				pointsShader.use();
-				// glBindVertexArray(verts_vao);
-				// elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
-				glDrawElements(GL_POINTS, numVisible, GL_UNSIGNED_INT, 0);
-				lastDraw = numVisible;
-			}
-			else
-			{
-				// draw points
-				pointsShader.use();
-				// glBindVertexArray(verts_vao);
-				glDrawArrays(GL_POINTS, 0, num_verts);
-				lastDraw = num_verts;
+
+				// updated uniform with new view matrix
+				glUniformMatrix4fv(pointsShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(camera.getView()));
+
+				if (doProgressive)
+				{
+
+					// prepare our element buffer for drawing
+					// prepare the 'count' argument for glDrawElements
+					size_t numVisible = 0;
+					#define EBO_GPU true
+					#if EBO_GPU
+					{
+						rmt_ScopedCPUSample(IndexBufferCompute, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+						rmt_ScopedOpenGLSample(IndexBufferComputeGL);
+						// use a compute shader to count the elements in the visibility buffer
+						visComputeShader.use();
+						// this should already be set
+						visBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 0);
+						elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
+						// since we can only access the buffer as unsigned ints, we need to dispatch ceil(numVertsBytes / sizeof(uint)) shader invocations
+
+						{
+							rmt_ScopedCPUSample(IndexBufferComputeShader, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+							rmt_ScopedOpenGLSample(IndexBufferComputeShaderGL);
+							glDispatchCompute(ceil(numVertsBytes / 4), 1, 1);
+						}
+						{
+							rmt_ScopedCPUSample(IndexBufferComputeCounterGet, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+							rmt_ScopedOpenGLSample(IndexBufferComputeCounterGetGL);
+							// get the atomic counter value
+							glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), &numVisible);
+						}
+						{
+							rmt_ScopedCPUSample(IndexBufferComputeCounterReset, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+							rmt_ScopedOpenGLSample(IndexBufferComputeCounterResetGL);
+							// reset the counter value
+							glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &zero, GL_DYNAMIC_DRAW);
+							// TODO: Filling random undrawn indices
+						}
+					}
+					#else // CPU
+						// count our visibility buffer
+						std::vector<GLubyte> buf(numVertsBytes, 0);
+						visBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
+						glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, numVertsBytes, buf.data());
+						std::vector<GLuint> visibleIndices, fillIndices;
+						visibleIndices.reserve(num_verts);
+						fillIndices.reserve(num_verts);
+						/*
+						for (int i = 0; i < buf.size(); ++i)
+						{
+							GLubyte e = buf[i];
+							while (e)
+							{
+								++numVisible;
+								e &= e - 1;
+							}
+						}
+						*/
+						size_t pointIndex = 0;
+						for (size_t i = 0; i < numVertsBytes; ++i)
+						{
+							GLubyte e = buf[i];
+							// 8 bits per ubyte, so we bit shift
+							for (int j = 0; j < 8; ++j, ++pointIndex)
+							{
+								if (e & 1)
+								{
+									visibleIndices.push_back(pointIndex);
+								}
+								else
+								{
+									fillIndices.push_back(pointIndex);
+								}
+
+								e >>= 1;
+							}
+						}
+
+						numVisible = visibleIndices.size();
+
+						// if we vertices to shuffle in, shuffle in some of the invisible points
+						if (!fillIndices.empty())
+						{
+							size_t fillCount = std::min(static_cast<size_t>(fillRate), fillIndices.size());
+							std::shuffle(std::begin(fillIndices), std::end(fillIndices), rng);
+							for (size_t i = 0; i < fillCount; ++i)
+							{
+								visibleIndices.push_back(fillIndices[i]);
+							}
+							numVisible += fillCount;
+						}
+
+						// elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
+						glBufferData(GL_ELEMENT_ARRAY_BUFFER, numVisible * sizeof(GLuint), &visibleIndices[0], GL_DYNAMIC_COPY);
+
+						// clear our visibility buffer
+						glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
+					#endif
+
+					{
+						rmt_ScopedCPUSample(DrawPoints_progressive, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+						rmt_ScopedOpenGLSample(DrawPoints_GL_progressive);
+						// draw points
+						pointsShader.use();
+						// glBindVertexArray(verts_vao);
+						// elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
+						glDrawElements(GL_POINTS, numVisible, GL_UNSIGNED_INT, 0);
+						lastDraw = numVisible;
+					}
+				}
+				else
+				{
+					rmt_ScopedCPUSample(DrawPoints, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+					rmt_ScopedOpenGLSample(DrawPoints_GL);
+
+					// draw points
+					pointsShader.use();
+					// glBindVertexArray(verts_vao);
+					glDrawArrays(GL_POINTS, 0, num_verts);
+					lastDraw = num_verts;
+				}
 			}
 
-			// screenspace output pass
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			glClear(GL_COLOR_BUFFER_BIT);
-			glDisable(GL_DEPTH_TEST);
-			outputShader.use();
-			// The vertex shader will create a screen space quad, so no need to bind a different VAO & VBO
-			glDrawArrays(GL_TRIANGLES, 0, 6);
+			{
+				rmt_ScopedCPUSample(ScreenPass, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+				rmt_ScopedOpenGLSample(ScreenPass_GL);
+
+				// screenspace output pass
+				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+				glClear(GL_COLOR_BUFFER_BIT);
+				glDisable(GL_DEPTH_TEST);
+				outputShader.use();
+				// The vertex shader will create a screen space quad, so no need to bind a different VAO & VBO
+				glDrawArrays(GL_TRIANGLES, 0, 6);
+			}
 
 			// draw the UI elements
-
-			// Start the ImGui frame
-			ImGui_ImplOpenGL3_NewFrame();
-			ImGui_ImplSDL2_NewFrame(window);
-			ImGui::NewFrame();
-
-			// stats window
-			ImGui::Begin("Controls");
-			ImGui::Checkbox("Progressive Render", &doProgressive);
-
-			if (doProgressive)
 			{
-				ImGui::Text("Fill Rate (per frame):");
-				ImGui::SliderInt("", &fillRate, 0, maxFillRate);
+				rmt_ScopedCPUSample(ImGuiPass, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+				rmt_ScopedOpenGLSample(ImGuiPass_GL);
+
+				// Start the ImGui frame
+				ImGui_ImplOpenGL3_NewFrame();
+				ImGui_ImplSDL2_NewFrame(window);
+				ImGui::NewFrame();
+
+				// stats window
+				ImGui::Begin("Controls");
+				ImGui::Checkbox("Progressive Render", &doProgressive);
+
+				if (doProgressive)
+				{
+					ImGui::Text("Fill Rate (per frame):");
+					ImGui::SliderInt("", &fillRate, 0, maxFillRate);
+				}
+
+				ImGui::Separator();
+
+				ImGui::Text("Framerate: %u fps", fps_current);
+				ImGui::Text("Drawing %u / %u points (%.2f%%)", lastDraw, num_verts, (lastDraw * 100.0f / num_verts));
+				ImGui::End();
+
+				// Rendering
+				ImGui::Render();
+				ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 			}
 
-			ImGui::Separator();
-
-			ImGui::Text("Framerate: %u fps", fps_current);
-			ImGui::Text("Drawing %u / %u points (%.2f%%)", lastDraw, num_verts, (lastDraw * 100.0f / num_verts));
-			ImGui::End();
-
-			// Rendering
-			ImGui::Render();
-			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
 			// swap window to update opengl
-			SDL_GL_SwapWindow(window);
+			{
+				rmt_ScopedCPUSample(SDLSwapWindow, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
+				rmt_ScopedOpenGLSample(SDLSwapWindow_GL);
+				SDL_GL_SwapWindow(window);
+			}
 		}
 
 		glDeleteFramebuffers(1, &idFBO);
@@ -511,6 +570,9 @@ int main(int argc, char *argv[])
 	}
 
 	// Cleanup
+	rmt_UnbindOpenGL();
+	rmt_DestroyGlobalInstance(rmt);
+
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplSDL2_Shutdown();
 	ImGui::DestroyContext();

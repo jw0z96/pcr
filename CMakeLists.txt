@@ -51,5 +51,16 @@ add_library(imgui STATIC
 	libs/imgui/imstb_truetype.h
 )
 
+# remotery for profiling?
+add_library(remotery
+	libs/Remotery/Remotery.h
+	libs/Remotery/Remotery.c
+)
+# add a definition to use opengl profiling
+target_compile_definitions(remotery PRIVATE RMT_USE_OPENGL)
+# remotery requires pthread and dlopen/dlclose linkage
+find_package(Threads)
+target_link_libraries(remotery ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+
 # link our executable against external libraries
-target_link_libraries(PointCloudRendering imgui ${SDL2_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARY})
+target_link_libraries(PointCloudRendering imgui remotery ${SDL2_LIBRARIES} ${GLEW_LIBRARIES} ${OPENGL_LIBRARY})

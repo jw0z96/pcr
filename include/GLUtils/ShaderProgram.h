@@ -22,7 +22,7 @@ public:
 
 	ShaderProgram(const std::list<ShaderComponent>& components);
 
-	inline ~ShaderProgram() { glDeleteProgram(m_shaderProgramID); }
+	inline ~ShaderProgram() { if (m_shaderProgramID) glDeleteProgram(m_shaderProgramID); }
 
 	void use() const;
 

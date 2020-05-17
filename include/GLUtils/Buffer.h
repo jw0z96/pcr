@@ -13,7 +13,7 @@ class Buffer
 public:
 	Buffer() : m_id(0) { glGenBuffers(1, &m_id); }
 
-	~Buffer() { glDeleteBuffers(1, &m_id); }
+	~Buffer() { if (m_id) glDeleteBuffers(1, &m_id); }
 
 	inline void bindAs(const GLenum &type) const { glBindBuffer(type, m_id); }
 

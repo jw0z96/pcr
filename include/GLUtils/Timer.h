@@ -14,27 +14,27 @@ namespace GLUtils
 	}
 
 	// Start a timer given it's hash, prefer the 'named' macro below to do compile time hashing
-	void _startTimer(const size_t& id);
-#define startTimer(a) _startTimer(GLUtils::constStringHash(#a))
+	void _startTimer(const size_t& hash);
+#define startTimer(name) _startTimer(GLUtils::constStringHash(#name))
 
 	// End a timer given it's hash, prefer the 'named' macro below to do compile time hashing
-	void _endTimer(const size_t& id);
-#define endTimer(a) _endTimer(GLUtils::constStringHash(#a))
+	void _endTimer(const size_t& hash);
+#define endTimer(name) _endTimer(GLUtils::constStringHash(#name))
 
 	// A timer which starts upon construction, and ends when it goes out of scope...
 	struct _scopedTimer
 	{
-		~_scopedTimer() { _endTimer(id); }
-		const size_t id;
+		~_scopedTimer() { _endTimer(hash); }
+		const size_t hash;
 	};
 	// TODO: what if someone calls this twice with the same name?
-#define scopedTimer(a) \
-	_scopedTimer timer_##a = {GLUtils::constStringHash(#a)}; \
-	GLUtils::_startTimer(timer_##a.id)
+#define scopedTimer(name) \
+	_scopedTimer _timer_##name = {GLUtils::constStringHash(#name)}; \
+	GLUtils::_startTimer(_timer_##name.hash)
 
 	// Get a timer's elapsed value given it's hash, prefer the 'named' macro below to do compile time hashing
-	float _getElapsed(const size_t& id);
-#define getElapsed(a) _getElapsed(GLUtils::constStringHash(#a))
+	float _getElapsed(const size_t& hash);
+#define getElapsed(name) _getElapsed(GLUtils::constStringHash(#name))
 
 	// awkwardly needed, since we'll need to ensure the destructors of the Timer objects in the static map are
 	// called before the gl context is destroyed

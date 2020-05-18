@@ -28,8 +28,6 @@
 #include "GLUtils/Buffer.h"
 #include "GLUtils/ShaderProgram.h"
 
-#include <Remotery/Remotery.h>
-
 #define SCREEN_WIDTH 1024
 #define SCREEN_HEIGHT 1024
 
@@ -104,12 +102,6 @@ int main(int argc, char *argv[])
 	// Setup Platform/Renderer bindings
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init("#version 420"); // glsl version
-
-	// Init Remotery
-	// Remotery* rmt;
-	// rmt_CreateGlobalInstance(&rmt);
-	// rmt_BindOpenGL();
-
 
 	// Scope to ensure ShaderProgram and GLBuffer destructors are called before window/context destructors
 	{
@@ -312,27 +304,19 @@ int main(int argc, char *argv[])
 		const unsigned int maxFillRate = std::min(static_cast<unsigned int>(100000), num_verts); // 100k reasonable maximum?
 		bool doProgressive = false;
 
-		GLUtils::Timer frameTimer, idPassTimer, indexComputeTimer, indexComputeSetupTimer, indexComputeDispatchTimer, indexCounterReadTimer, indexCounterResetTimer, pointsDrawTimer, outputPassTimer;
-
-
 		bool quit = false;
 		SDL_Event event;
 		while (!quit)
 		{
-			// rmt_ScopedCPUSample(FrameTotal, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-			// rmt_ScopedOpenGLSample(FrameTotal_GL);
-			frameTimer.start();
+			GLUtils::startTimer(frameTimer);
 
 			// event handling
 			{
-				// rmt_ScopedCPUSample(EventHandling, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-				// rmt_ScopedOpenGLSample(EventHandling_GL);
 
 				while (SDL_PollEvent(&event) != 0)
 				{
 					ImGui_ImplSDL2_ProcessEvent(&event);
 					{
-						rmt_ScopedCPUSample(CameraEvent, RMTSF_None)
 						camera.processInput(event);
 					}
 					switch (event.type)
@@ -385,9 +369,7 @@ int main(int argc, char *argv[])
 
 
 			{
-				// rmt_ScopedCPUSample(IDPass, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-				// rmt_ScopedOpenGLSample(IDPass_GL);
-				idPassTimer.start();
+				GLUtils::scopedTimer(idPassTimer);
 
 				// ID pass
 				glBindFramebuffer(GL_FRAMEBUFFER, idFBO);
@@ -401,45 +383,33 @@ int main(int argc, char *argv[])
 
 				if (doProgressive)
 				{
-					indexComputeTimer.start();
+					GLUtils::scopedTimer(indexComputeTimer);
 					// prepare our element buffer for drawing
 					// prepare the 'count' argument for glDrawElements
 					size_t numVisible = 0;
 					#define EBO_GPU true
 					#if EBO_GPU
 					{
-						indexComputeSetupTimer.start();
-						// rmt_ScopedCPUSample(IndexBufferCompute, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-						// rmt_ScopedOpenGLSample(IndexBufferComputeGL);
+						GLUtils::scopedTimer(indexComputeSetupTimer);
 						// use a compute shader to count the elements in the visibility buffer
 						visComputeShader.use();
 						// this should already be set
 						visBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 0);
 						elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
-						indexComputeSetupTimer.end();
 						// since we can only access the buffer as unsigned ints, we need to dispatch ceil(numVertsBytes / sizeof(uint)) shader invocations
 						{
-							indexComputeDispatchTimer.start();
-							// rmt_ScopedCPUSample(IndexBufferComputeShader, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-							// rmt_ScopedOpenGLSample(IndexBufferComputeShaderGL);
+							GLUtils::scopedTimer(indexComputeDispatchTimer);
 							glDispatchCompute(dispatchCount, 1, 1);
-							indexComputeDispatchTimer.end();
 						}
 						{
-							indexCounterReadTimer.start();
-							// rmt_ScopedCPUSample(IndexBufferComputeCounterGet, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-							// rmt_ScopedOpenGLSample(IndexBufferComputeCounterGetGL);
+							GLUtils::scopedTimer(indexCounterReadTimer);
 							// get the atomic counter value
 							glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), &numVisible);
-							indexCounterReadTimer.end();
 						}
 						{
-							indexCounterResetTimer.start();
-							// rmt_ScopedCPUSample(IndexBufferComputeCounterReset, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-							// rmt_ScopedOpenGLSample(IndexBufferComputeCounterResetGL);
+							GLUtils::scopedTimer(indexCounterResetTimer);
 							// reset the counter value
 							glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &zero, GL_DYNAMIC_DRAW);
-							indexCounterResetTimer.end();
 							// TODO: Filling random undrawn indices
 						}
 					}
@@ -502,41 +472,31 @@ int main(int argc, char *argv[])
 						// clear our visibility buffer
 						glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
 					#endif
-					indexComputeTimer.end();
 
 					{
-						// rmt_ScopedCPUSample(DrawPoints_progressive, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-						// rmt_ScopedOpenGLSample(DrawPoints_GL_progressive);
 						// draw points
-						pointsDrawTimer.start();
+						GLUtils::scopedTimer(pointsDrawTimer);
 						pointsShader.use();
 						// glBindVertexArray(verts_vao);
 						// elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 						glDrawElements(GL_POINTS, numVisible, GL_UNSIGNED_INT, 0);
 						lastDraw = numVisible;
-						pointsDrawTimer.end();
 					}
 				}
 				else
 				{
-					// rmt_ScopedCPUSample(DrawPoints, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-					// rmt_ScopedOpenGLSample(DrawPoints_GL);
 					// draw points
-					pointsDrawTimer.start();
+					GLUtils::scopedTimer(pointsDrawTimer);
 					pointsShader.use();
 					// glBindVertexArray(verts_vao);
 					glDrawArrays(GL_POINTS, 0, num_verts);
 					lastDraw = num_verts;
-					pointsDrawTimer.end();
 				}
 
-				idPassTimer.end();
 			}
 
 			{
-				// rmt_ScopedCPUSample(ScreenPass, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-				// rmt_ScopedOpenGLSample(ScreenPass_GL);
-				outputPassTimer.start();
+				GLUtils::scopedTimer(outputPassTimer);
 
 				// screenspace output pass
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -545,13 +505,10 @@ int main(int argc, char *argv[])
 				outputShader.use();
 				// The vertex shader will create a screen space quad, so no need to bind a different VAO & VBO
 				glDrawArrays(GL_TRIANGLES, 0, 6);
-				outputPassTimer.end();
 			}
 
 			// draw the UI elements
 			{
-				// rmt_ScopedCPUSample(ImGuiPass, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-				// rmt_ScopedOpenGLSample(ImGuiPass_GL);
 
 				// Start the ImGui frame
 				ImGui_ImplOpenGL3_NewFrame();
@@ -573,18 +530,18 @@ int main(int argc, char *argv[])
 				ImGui::Text("Drawing %u / %u points (%.2f%%)", lastDraw, num_verts, (lastDraw * 100.0f / num_verts));
 
 				ImGui::Separator();
-				ImGui::Text("Frame time: %.1f ms", frameTimer.elapsed());
-				ImGui::Text("	ID Pass time: %.1f ms", idPassTimer.elapsed());
+				ImGui::Text("Frame time: %.1f ms", GLUtils::getElapsed(frameTimer));
+				ImGui::Text("	ID Pass time: %.1f ms", GLUtils::getElapsed(idPassTimer));
 				if (doProgressive)
 				{
-					ImGui::Text("		Index Compute time: %.1f ms", indexComputeTimer.elapsed());
-					ImGui::Text("			Index Compute Setup time: %.1f ms", indexComputeSetupTimer.elapsed());
-					ImGui::Text("			Index Compute Dispatch time: %.1f ms", indexComputeDispatchTimer.elapsed());
-					ImGui::Text("			Index Counter Read time: %.1f ms", indexCounterReadTimer.elapsed());
-					ImGui::Text("			Index Counter Reset time: %.1f ms", indexCounterResetTimer.elapsed());
+					ImGui::Text("		Index Compute time: %.1f ms", GLUtils::getElapsed(indexComputeTimer));
+					ImGui::Text("			Index Compute Setup time: %.1f ms", GLUtils::getElapsed(indexComputeSetupTimer));
+					ImGui::Text("			Index Compute Dispatch time: %.1f ms", GLUtils::getElapsed(indexComputeDispatchTimer));
+					ImGui::Text("			Index Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
+					ImGui::Text("			Index Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
 				}
-				ImGui::Text("		Points Draw time: %.1f ms", pointsDrawTimer.elapsed());
-				ImGui::Text("	Output Pass time: %.1f ms", outputPassTimer.elapsed());
+				ImGui::Text("		Points Draw time: %.1f ms", GLUtils::getElapsed(pointsDrawTimer));
+				ImGui::Text("	Output Pass time: %.1f ms", GLUtils::getElapsed(outputPassTimer));
 				ImGui::End();
 
 				// Rendering
@@ -594,12 +551,10 @@ int main(int argc, char *argv[])
 
 			// swap window to update opengl
 			{
-				// rmt_ScopedCPUSample(SDLSwapWindow, RMTSF_None); // RMTSF_Aggregate, RMTSF_Recursive
-				// rmt_ScopedOpenGLSample(SDLSwapWindow_GL);
 				SDL_GL_SwapWindow(window);
 			}
 
-			frameTimer.end();
+			GLUtils::endTimer(frameTimer);
 		}
 
 		glDeleteFramebuffers(1, &idFBO);
@@ -612,8 +567,8 @@ int main(int argc, char *argv[])
 	}
 
 	// Cleanup
-	// rmt_UnbindOpenGL();
-	// rmt_DestroyGlobalInstance(rmt);
+	GLUtils::clearTimers();
+
 
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplSDL2_Shutdown();

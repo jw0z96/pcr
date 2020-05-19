@@ -47,6 +47,11 @@ namespace GLUtils
 
 		~Timer() { glDeleteQueries(s_bufferSize * 2, &m_queries.data()->start); }
 
+		// Disable copy constructor and assignment operator, since we're managing OpenGL resources, and it's
+		// not worth the hassle to share their ownership
+		Timer(const Timer&) = delete;
+		Timer& operator=(const Timer&) = delete;
+
 		void start() const { glQueryCounter(m_queries.front().start, GL_TIMESTAMP); }
 
 		void end();

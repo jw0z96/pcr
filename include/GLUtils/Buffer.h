@@ -8,39 +8,44 @@
 
 namespace GLUtils
 {
-class Buffer
-{
-public:
-	Buffer() : m_id(0) { glGenBuffers(1, &m_id); }
-
-	~Buffer() { if (m_id) glDeleteBuffers(1, &m_id); }
-
-	inline void bindAs(const GLenum &type) const { glBindBuffer(type, m_id); }
-
-	inline void bindAsIndexed(const GLenum &type, const GLuint &index) const
+	class Buffer
 	{
-		glBindBufferBase(type, index, m_id);
-	}
+	public:
+		Buffer() : m_id(0) { glGenBuffers(1, &m_id); }
 
-	static inline void unbind(const GLenum &type) { glBindBuffer(type, 0); }
+		~Buffer() { glDeleteBuffers(1, &m_id); }
 
-	// uh... expects a bound GL_TEXTURE_BUFFER texture object
-	inline void attachToTextureBuffer(const GLenum &format) const
-	{
-		GLint tex = 0;
-		glGetIntegerv(GL_TEXTURE_BINDING_BUFFER, &tex);
-		if (!tex)
+		// Disable copy constructor and assignment operator, since we're managing OpenGL resources, and it's
+		// not worth the hassle to share their ownership
+		Buffer(const Buffer &) = delete;
+		Buffer &operator=(const Buffer &) = delete;
+
+		inline void bindAs(const GLenum &type) const { glBindBuffer(type, m_id); }
+
+		inline void bindAsIndexed(const GLenum &type, const GLuint &index) const
 		{
-			// TODO: Throw an error
-			return;
+			glBindBufferBase(type, index, m_id);
 		}
 
-		glTexBuffer(GL_TEXTURE_BUFFER, format, m_id);
-	}
+		static inline void unbind(const GLenum &type) { glBindBuffer(type, 0); }
 
-private:
-	// Buffer ID
-	GLuint m_id;
-};
+		// uh... expects a bound GL_TEXTURE_BUFFER texture object
+		inline void attachToTextureBuffer(const GLenum &format) const
+		{
+			GLint tex = 0;
+			glGetIntegerv(GL_TEXTURE_BINDING_BUFFER, &tex);
+			if (!tex)
+			{
+				// TODO: Throw an error
+				return;
+			}
+
+			glTexBuffer(GL_TEXTURE_BUFFER, format, m_id);
+		}
+
+	private:
+		// Buffer ID
+		GLuint m_id;
+	};
 
 } // namespace GLUtils

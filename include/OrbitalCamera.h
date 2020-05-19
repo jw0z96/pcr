@@ -4,14 +4,13 @@
 
 #include <glm/glm.hpp>
 
-// This just combines the code for calculating the view and projection matrices, but really they're independent of each other
+// This just combines the code for calculating the view and projection matrices, but really they're
+// independent of each other
 
 class OrbitalCamera
 {
 public:
 	OrbitalCamera();
-
-	// ~OrbitalCamera(); // let the compiler do this
 
 	void processInput(const SDL_Event& event);
 

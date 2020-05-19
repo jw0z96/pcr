@@ -55,7 +55,7 @@ void GLUtils::clearTimers() { s_timers.clear(); }
 
 GLUtils::Timer::Timer() :
 	m_queries(), // default initialize elements
-	m_elapsed(0)
+	m_elapsed(0.0f)
 {
 	glGenQueries(s_bufferSize * 2, &m_queries.data()->start);
 }

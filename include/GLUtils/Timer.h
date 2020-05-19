@@ -21,16 +21,16 @@ namespace GLUtils
 	void _endTimer(const size_t& hash);
 #define endTimer(name) _endTimer(GLUtils::constStringHash(#name))
 
-	// A timer which starts upon construction, and ends when it goes out of scope...
+	// Helper for the scoped timer, starts the timer when it's constructed, ends it when it's destructed
 	struct _scopedTimer
 	{
+		_scopedTimer(const size_t& h) : hash(h) { _startTimer(hash); }
 		~_scopedTimer() { _endTimer(hash); }
 		const size_t hash;
 	};
 	// TODO: what if someone calls this twice with the same name?
-#define scopedTimer(name) \
-	_scopedTimer _timer_##name = {GLUtils::constStringHash(#name)}; \
-	GLUtils::_startTimer(_timer_##name.hash)
+#define scopedTimer(name) _scopedTimer _timer_##name(GLUtils::constStringHash(#name))
+
 
 	// Get a timer's elapsed value given it's hash, prefer the 'named' macro below to do compile time hashing
 	float _getElapsed(const size_t& hash);

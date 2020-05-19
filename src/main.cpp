@@ -383,36 +383,40 @@ int main(int argc, char *argv[])
 
 				if (doProgressive)
 				{
-					GLUtils::scopedTimer(indexComputeTimer);
+					size_t numVisible = 0;
+					{
+						GLUtils::scopedTimer(indexComputeTimer);
+
 					// prepare our element buffer for drawing
 					// prepare the 'count' argument for glDrawElements
-					size_t numVisible = 0;
 					#define EBO_GPU true
 					#if EBO_GPU
-					{
-						GLUtils::scopedTimer(indexComputeSetupTimer);
-						// use a compute shader to count the elements in the visibility buffer
-						visComputeShader.use();
-						// this should already be set
-						visBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 0);
-						elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
+						{
+							{
+								GLUtils::scopedTimer(indexComputeSetupTimer);
+							// use a compute shader to count the elements in the visibility buffer
+								visComputeShader.use();
+							// this should already be set
+								visBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 0);
+								elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
+							}
 						// since we can only access the buffer as unsigned ints, we need to dispatch ceil(numVertsBytes / sizeof(uint)) shader invocations
-						{
-							GLUtils::scopedTimer(indexComputeDispatchTimer);
-							glDispatchCompute(dispatchCount, 1, 1);
-						}
-						{
-							GLUtils::scopedTimer(indexCounterReadTimer);
+							{
+								GLUtils::scopedTimer(indexComputeDispatchTimer);
+								glDispatchCompute(dispatchCount, 1, 1);
+							}
+							{
+								GLUtils::scopedTimer(indexCounterReadTimer);
 							// get the atomic counter value
-							glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), &numVisible);
-						}
-						{
-							GLUtils::scopedTimer(indexCounterResetTimer);
+								glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), &numVisible);
+							}
+							{
+								GLUtils::scopedTimer(indexCounterResetTimer);
 							// reset the counter value
-							glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &zero, GL_DYNAMIC_DRAW);
+								glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &zero, GL_DYNAMIC_DRAW);
 							// TODO: Filling random undrawn indices
+							}
 						}
-					}
 					#else // CPU
 						// count our visibility buffer
 						std::vector<GLubyte> buf(numVertsBytes, 0);
@@ -472,7 +476,7 @@ int main(int argc, char *argv[])
 						// clear our visibility buffer
 						glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
 					#endif
-
+					}
 					{
 						// draw points
 						GLUtils::scopedTimer(pointsDrawTimer);

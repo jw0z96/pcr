@@ -14,8 +14,9 @@ namespace
 
 void GLUtils::_startTimer(const size_t& id)
 {
-	TimerMap::const_iterator it = s_timers.try_emplace(id).first;
-	it->second.start();
+	// TimerMap::const_iterator it = s_timers.try_emplace(id).first;
+	// it->second.start();
+	s_timers[id].start(); // or this, since GLUtils::Timer is trivially constructed
 }
 
 void GLUtils::_endTimer(const size_t& id)

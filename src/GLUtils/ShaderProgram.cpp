@@ -93,9 +93,11 @@ ShaderProgram::ShaderProgram(const std::list<ShaderComponent>& components) :
 	for (GLint i = 0; i < numUniforms; ++i)
 	{
 		glGetActiveUniform(m_shaderProgramID, i, maxUniformNameLen, &read, &size, &type, uniformName.data());
+		/*
 		std::cout << "Shader[" << m_shaderProgramID << "] uniform[" << i << "] name["
 				  << std::string(uniformName.data()) << "] location["
 				  << glGetUniformLocation(m_shaderProgramID, uniformName.data()) << "]\n";
+		*/
 		m_uniformLocationCache[uniformName.data()] =
 			glGetUniformLocation(m_shaderProgramID, uniformName.data());
 	}

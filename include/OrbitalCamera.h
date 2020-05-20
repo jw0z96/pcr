@@ -46,15 +46,6 @@ private:
 	void updateProjection();
 
 	// View Matrix variables
-	// world up-vector used when calculating the view matrix
-	static const glm::vec3 s_worldUp;
-
-	// mouse sensitivity multiplier for the camera rotation control
-	static const float s_mouseSensitivity;
-
-	// scroll sensitivity multiplier for the camera distance control
-	static const float s_scrollSensitivity;
-
 	// theta being the azimuthal angle, phi being altitude/elevation angle, in radians
 	// see: https://i.stack.imgur.com/xA6Im.png (Y/Z swapped)
 	// used for calculating the view point on a unit sphere

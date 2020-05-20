@@ -259,7 +259,6 @@ int main(int argc, char *argv[])
 		// glm::mat4 view;
 
 		// count fps
-		#define FPS_INTERVAL 1.0 // seconds.
 		unsigned int fps_lasttime = SDL_GetTicks(); //the last recorded time.
 		unsigned int fps_current = 0; //the current FPS.
 		unsigned int fps_frames = 0; //frames passed since the last recorded fps.
@@ -284,8 +283,6 @@ int main(int argc, char *argv[])
 		glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &counterValue, GL_DYNAMIC_DRAW);
 		// glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, counterBuffer);
 		counterBuffer.bindAsIndexed(GL_ATOMIC_COUNTER_BUFFER, 0);
-
-		auto rng = std::default_random_engine {};
 
 		// determine workgroup count
 		int work_grp_cnt;
@@ -316,40 +313,23 @@ int main(int argc, char *argv[])
 				while (SDL_PollEvent(&event) != 0)
 				{
 					ImGui_ImplSDL2_ProcessEvent(&event);
-					{
-						camera.processInput(event);
-					}
+					camera.processInput(event);
+
 					switch (event.type)
 					{
 						// exit if the window is closed
 						case SDL_QUIT:
 							quit = true;
 							break;
+						/*
 						// check for keypresses
 						case SDL_KEYDOWN:
+							// if we want to recompile shaders? (replace the shader objects)
 							if (event.key.keysym.sym == SDLK_r)
 							{
-								// outputShader.compile();
-								// pointsShader.compile();
-								// pointsShader.use();
-								// uhh
-								// update the location of the 'view' uniform location
-								// viewLoc = pointsShader.getUniformLocation("view");
-								// update the values in the the projection and model uniforms
-								// glUniformMatrix4fv(
-								// 	pointsShader.getUniformLocation("projection"),
-								// 	1,
-								// 	GL_FALSE,
-								// 	glm::value_ptr(projection)
-								// );
-								// glUniformMatrix4fv(
-								// 	pointsShader.getUniformLocation("model"),
-								// 	1,
-								// 	GL_FALSE,
-								// 	glm::value_ptr(model)
-								// );
 							}
 							break;
+						*/
 						default:
 							break;
 					}

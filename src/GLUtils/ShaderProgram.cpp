@@ -41,7 +41,8 @@ namespace
 		{
 			char log[512];
 			glGetShaderInfoLog(shader, 512, NULL, log);
-			std::cout << "Error: Failed to compile shader component of type " << shaderType << ": " << log << "\n";
+			std::cout << "Error: Failed to compile shader component of type " << shaderType << ": " << log
+					  << "\n";
 			glDeleteShader(shader);
 			return false; // unsuccessful
 		}

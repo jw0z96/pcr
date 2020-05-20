@@ -4,6 +4,8 @@
 
 #include <glm/glm.hpp>
 
+#include <optional>
+
 // This just combines the code for calculating the view and projection matrices, but really they're
 // independent of each other
 
@@ -20,7 +22,12 @@ public:
 	// distance from target, a 'dolly' of sorts
 	inline void setDistance(float distance) { m_distance = distance; }
 
-	inline glm::mat4 getView() const { return m_viewMat; }
+	const glm::mat4& getView() const
+	{
+		// not sure why this doesn't work, whilst returning a reference:
+		// return m_viewMat.value_or(m_viewMat.emplace(calculateView()));
+		return m_viewMat.has_value() ? m_viewMat.value() : m_viewMat.emplace(calculateView());
+	}
 
 	// Projection Matrix methods
 	// FOV angle in degrees
@@ -36,11 +43,11 @@ public:
 		m_farClip = far;
 	}
 
-	inline glm::mat4 getProjection() const { return m_projectionMat; }
+	inline const glm::mat4& getProjection() const { return m_projectionMat; }
 
 private:
 	// Recalculate the view matrix
-	void updateView();
+	const glm::mat4 calculateView() const;
 
 	// Recalculate the projection matrix
 	void updateProjection();
@@ -57,8 +64,10 @@ private:
 	// distance from m_target
 	float m_distance;
 
-	// the actual view matrix...
-	glm::mat4 m_viewMat;
+	// The actual view matrix... we make this a std::optional so that we can use std::optional's nullopt as a 'dirty'
+	// state flag for when it needs to be recalculated, note that we don't do the same for projection, since we can't
+	// modify that currently. Mutable so that the 'getView' is still const...
+	mutable std::optional<const glm::mat4> m_viewMat;
 
 	// Projection Matrix variables
 	// projection FOV angle in degrees

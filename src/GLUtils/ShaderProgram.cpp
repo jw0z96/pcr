@@ -5,6 +5,9 @@
 #include <sstream>
 #include <vector>
 
+#include <algorithm>
+#include <functional>
+
 namespace
 {
 	bool compileShaderSource(const GLuint& programID, GLenum shaderType, const char* shaderPath)
@@ -38,7 +41,7 @@ namespace
 		{
 			char log[512];
 			glGetShaderInfoLog(shader, 512, NULL, log);
-			std::cout << "Error: compiling shader component of type " << shaderType << ": " << log << "\n";
+			std::cout << "Error: Failed to compile shader component of type " << shaderType << ": " << log << "\n";
 			glDeleteShader(shader);
 			return false; // unsuccessful
 		}
@@ -56,14 +59,13 @@ using namespace GLUtils;
 ShaderProgram::ShaderProgram(const std::list<ShaderComponent>& components) :
 	m_shaderProgramID(glCreateProgram()), m_isValid(false)
 {
-	for (const ShaderComponent& component : components)
+	if (!std::all_of(components.begin(), components.end(), [this](const ShaderComponent& component) {
+			return compileShaderSource(m_shaderProgramID, component.type, component.source);
+		}))
 	{
-		if (!compileShaderSource(m_shaderProgramID, component.type, component.source))
-		{
-			// break here, don't bother linking?
-			std::cout << "Error: compiling shader: " << component.source << "\n";
-			return;
-		}
+		// break here, don't bother linking?
+		std::cout << "Error: Failed whilst compiling shaders, will not attempt linking\n";
+		return;
 	}
 
 	// link the shaders to the program and
@@ -98,8 +100,8 @@ ShaderProgram::ShaderProgram(const std::list<ShaderComponent>& components) :
 				  << std::string(uniformName.data()) << "] location["
 				  << glGetUniformLocation(m_shaderProgramID, uniformName.data()) << "]\n";
 		*/
-		m_uniformLocationCache[uniformName.data()] =
-			glGetUniformLocation(m_shaderProgramID, uniformName.data());
+		const GLchar* uniformNameStr = uniformName.data();
+		m_uniformLocationCache[uniformNameStr] = glGetUniformLocation(m_shaderProgramID, uniformNameStr);
 	}
 }
 

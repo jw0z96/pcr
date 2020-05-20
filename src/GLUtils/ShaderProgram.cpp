@@ -32,7 +32,7 @@ namespace
 
 		const GLuint shader = glCreateShader(shaderType);
 		const char* shaderCStr = shaderStr.c_str(); // ugh
-		glShaderSource(shader, 1, &shaderCStr, NULL);
+		glShaderSource(shader, 1, &shaderCStr, nullptr);
 		glCompileShader(shader);
 
 		int shaderSuccess;
@@ -40,7 +40,7 @@ namespace
 		if (!shaderSuccess)
 		{
 			char log[512];
-			glGetShaderInfoLog(shader, 512, NULL, log);
+			glGetShaderInfoLog(shader, 512, nullptr, log);
 			std::cout << "Error: Failed to compile shader component of type " << shaderType << ": " << log
 					  << "\n";
 			glDeleteShader(shader);
@@ -77,7 +77,7 @@ ShaderProgram::ShaderProgram(const std::list<ShaderComponent>& components) :
 	if (!programSuccess)
 	{
 		char log[512];
-		glGetProgramInfoLog(m_shaderProgramID, 512, NULL, log);
+		glGetProgramInfoLog(m_shaderProgramID, 512, nullptr, log);
 		std::cout << "Error: shader program did not link: " << log << "\n";
 		return;
 	}

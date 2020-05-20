@@ -28,8 +28,8 @@
 #include "GLUtils/Buffer.h"
 #include "GLUtils/ShaderProgram.h"
 
-#define SCREEN_WIDTH 1024
-#define SCREEN_HEIGHT 1024
+constexpr unsigned int SCREEN_WIDTH = 1024;
+constexpr unsigned int SCREEN_HEIGHT = 1024;
 
 int main(int argc, char *argv[])
 {
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
 		glGenTextures(1, &idTexture);
 		// glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, idTexture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RED_INTEGER, GL_INT, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RED_INTEGER, GL_INT, nullptr);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		// glBindTexture(GL_TEXTURE_2D, 0);
@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
 		// glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_2D, depthTexture);
 		// glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 		// glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -145,8 +145,8 @@ int main(int argc, char *argv[])
 		// std::cout<<"gl error:"<<glGetError()<<"\n";
 
 		// tell OpenGL which attachments we'll use (of this framebuffer) for rendering
-		unsigned int attachments[] = { GL_COLOR_ATTACHMENT0 }; // , GL_DEPTH_ATTACHMENT }; // we don't need to list the depth attachment
-		glDrawBuffers(1, attachments);
+		const std::array<GLenum, 1> attachments = { GL_COLOR_ATTACHMENT0 }; // , GL_DEPTH_ATTACHMENT }; // we don't need to list the depth attachment
+		glDrawBuffers(1, attachments.data());
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		{
 			std::cout << "Error: Framebuffer is not complete!\n";
@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
 			glBufferData(GL_ARRAY_BUFFER, vert_pos->buffer.size_bytes(), vert_pos->buffer.get(), GL_STATIC_DRAW);
 
 			glEnableVertexAttribArray(0);
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
 
 			// generate buffers for colours
 			colBuffer.bindAs(GL_TEXTURE_BUFFER);
@@ -226,7 +226,7 @@ int main(int argc, char *argv[])
 
 			// generate an SSBO for the visibility
 			visBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
-			glBufferData(GL_SHADER_STORAGE_BUFFER, numVertsBytes, NULL, GL_DYNAMIC_COPY);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, numVertsBytes, nullptr, GL_DYNAMIC_COPY);
 			visBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 0);
 
 			// Generate an element buffer for the point indices to redraw
@@ -234,7 +234,7 @@ int main(int argc, char *argv[])
 			elementBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
 
 			// give it enough elements for a full draw
-			glBufferData(GL_SHADER_STORAGE_BUFFER, num_verts * sizeof(GLuint), NULL, GL_DYNAMIC_COPY);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, num_verts * sizeof(GLuint), nullptr, GL_DYNAMIC_COPY);
 			elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
 
 			std::cout << "gl error: " << glGetError() << "\n"; // TODO: A proper macro for glErrors
@@ -463,7 +463,7 @@ int main(int argc, char *argv[])
 						pointsShader.use();
 						// glBindVertexArray(verts_vao);
 						// elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
-						glDrawElements(GL_POINTS, numVisible, GL_UNSIGNED_INT, 0);
+						glDrawElements(GL_POINTS, numVisible, GL_UNSIGNED_INT, nullptr);
 						lastDraw = numVisible;
 					}
 				}

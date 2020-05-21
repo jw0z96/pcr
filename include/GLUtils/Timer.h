@@ -8,7 +8,7 @@
 namespace GLUtils
 {
 	// hashes a string to a size_t, constexpr so it can be done at compile time
-	size_t constexpr constStringHash(char const* input)
+	constexpr size_t constStringHash(char const* input)
 	{
 		return *input ? static_cast<size_t>(*input) + 33 * constStringHash(input + 1) : 5381;
 	}

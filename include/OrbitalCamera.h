@@ -22,7 +22,7 @@ public:
 	// distance from target, a 'dolly' of sorts
 	inline void setDistance(float distance) { m_distance = distance; }
 
-	const glm::mat4& getView() const
+	glm::mat4 getView() const
 	{
 		// not sure why this doesn't work, whilst returning a reference:
 		// return m_viewMat.value_or(m_viewMat.emplace(calculateView()));
@@ -43,7 +43,7 @@ public:
 		m_farClip = far;
 	}
 
-	inline const glm::mat4& getProjection() const { return m_projectionMat; }
+	inline glm::mat4 getProjection() const { return m_projectionMat; }
 
 private:
 	// Recalculate the view matrix

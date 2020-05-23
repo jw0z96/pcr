@@ -34,8 +34,16 @@ public:
 	inline void setFOV(float fov) { m_fov = fov; }
 
 	// Make sure to call this when the aspect ratio of the window changes
-	inline void setAspect(float aspect) { m_aspect = aspect; }
-	inline void setAspect(float width, float height) { m_aspect = width / height; }
+	inline void setAspect(float aspect)
+	{
+		m_aspect = aspect;
+		updateProjection();
+	}
+	inline void setAspect(float width, float height)
+	{
+		m_aspect = width / height;
+		updateProjection();
+	}
 
 	inline void setNearFarClip(float near, float far)
 	{
@@ -64,9 +72,9 @@ private:
 	// distance from m_target
 	float m_distance;
 
-	// The actual view matrix... we make this a std::optional so that we can use std::optional's nullopt as a 'dirty'
-	// state flag for when it needs to be recalculated, note that we don't do the same for projection, since we can't
-	// modify that currently. Mutable so that the 'getView' is still const...
+	// The actual view matrix... we make this a std::optional so that we can use std::optional's nullopt as a
+	// 'dirty' state flag for when it needs to be recalculated, note that we don't do the same for projection,
+	// since we can't modify that currently. Mutable so that the 'getView' is still const...
 	mutable std::optional<const glm::mat4> m_viewMat;
 
 	// Projection Matrix variables

@@ -27,7 +27,7 @@ void OrbitalCamera::processInput(const SDL_Event& event)
 	{
 		case SDL_MOUSEMOTION:
 		{
-			if (event.motion.state & SDL_BUTTON_LMASK)
+			if (event.motion.state & SDL_BUTTON_RMASK) // right button so we don't conflict with ImGui - lazy!
 			{
 				m_theta -= event.motion.xrel * s_mouseSensitivity;
 				m_theta = glm::mod(m_theta, TWO_PI);

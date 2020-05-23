@@ -5,10 +5,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_sdl.h>
 #include <imgui/imgui_impl_opengl3.h>
@@ -18,8 +14,8 @@
 #include "GLUtils/Timer.h"
 
 // window should process width/height changes as an event, which can be queried by FBO objects
-constexpr unsigned int DEFAULT_SCREEN_WIDTH = 1024;
-constexpr unsigned int DEFAULT_SCREEN_HEIGHT = 1024;
+constexpr unsigned int DEFAULT_SCREEN_WIDTH = 800;
+constexpr unsigned int DEFAULT_SCREEN_HEIGHT = 600;
 
 // These are all things that should be handled properly eventually
 namespace SDL_GL_IMGUI_APP

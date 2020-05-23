@@ -5,6 +5,8 @@
 
 #include "GLUtils/Buffer.h"
 #include "GLUtils/Texture.h"
+#include "GLUtils/VAO.h"
+#include "GLUtils/Framebuffer.h"
 #include "GLUtils/ShaderProgram.h"
 #include "GLUtils/Timer.h"
 
@@ -14,13 +16,13 @@ class PointCloudScene
 {
 public:
 	PointCloudScene() :
-		m_idFBO(0), m_idTexture(), m_depthTexture(), m_colourTexture(),
+		m_idFBO(), m_idTexture(), m_depthTexture(), m_colourTexture(),
 		m_visComputeShader({{GL_COMPUTE_SHADER, "shaders/visibility_comp.glsl"}}),
 		m_pointsShader({{GL_VERTEX_SHADER, "shaders/points_vert.glsl"},
 						{GL_FRAGMENT_SHADER, "shaders/points_frag.glsl"}}),
 		m_outputShader({{GL_VERTEX_SHADER, "shaders/screenspace_vert.glsl"},
 						{GL_FRAGMENT_SHADER, "shaders/output_frag.glsl"}}),
-		m_pointCloudVAO(0), m_modelMat(glm::translate(
+		m_pointCloudVAO(), m_modelMat(glm::translate(
 								glm::rotate(glm::mat4(1.0), 3.14159f / 2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
 								glm::vec3(0.0f, 0.0f, -5.0f))),
 		m_pointsBuffer(), m_colBuffer(), m_visBuffer(), m_elementBuffer(), m_counterBuffer(), m_camera(),
@@ -62,10 +64,7 @@ public:
 		m_counterBuffer.bindAsIndexed(GL_ATOMIC_COUNTER_BUFFER, 0);
 	}
 
-	~PointCloudScene()
-	{
-		// TODO: delete m_idFBO, m_pointCloudVAO
-	}
+	// ~PointCloudScene(); // let the compiler do it
 
 	// Disable copy constructor and assignment operator, since we're managing external resources
 	PointCloudScene(const PointCloudScene&) = delete;
@@ -90,9 +89,8 @@ public:
 		glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size);
 		m_computeDispatchCount = ceil(numVertsBytes / 4);
 
-		// we have to generate and bind a VAO for the whole lot
-		glGenVertexArrays(1, &m_pointCloudVAO);
-		glBindVertexArray(m_pointCloudVAO);
+		// we have to bind a VAO to hold the vertex attributes for the buffers, and the element buffer bindings
+		m_pointCloudVAO.bind();
 
 		// generate buffers for verts, set the VAO attributes
 		m_pointsBuffer.bindAs(GL_ARRAY_BUFFER);
@@ -127,10 +125,10 @@ public:
 
 		// Generate an element buffer for the point indices to redraw
 		m_elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
-		m_elementBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
-
 		// give it enough elements for a full draw
-		glBufferData(GL_SHADER_STORAGE_BUFFER, m_numPointsTotal * sizeof(GLuint), nullptr, GL_DYNAMIC_COPY);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_numPointsTotal * sizeof(GLuint), nullptr, GL_DYNAMIC_COPY);
+		// Also bind it as a SSBO so we can use it in the compute shader
+		m_elementBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
 		m_elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
 
 		std::cout << "gl error: " << glGetError() << "\n"; // TODO: A proper macro for glErrors
@@ -161,7 +159,7 @@ public:
 			std::cout << "error resizing index framebuffer\n";
 		}
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		GLUtils::Framebuffer::bindDefault();
 		glViewport(0, 0, width, height);
 	}
 
@@ -200,7 +198,7 @@ public:
 			{
 				GLUtils::scopedTimer(pointsDrawTimer);
 
-				glBindFramebuffer(GL_FRAMEBUFFER, m_idFBO);
+				m_idFBO.bind();
 				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 				glEnable(GL_DEPTH_TEST);
 				// update point shader view uniform with new view matrix
@@ -224,7 +222,7 @@ public:
 		// Output Pass
 		{
 			GLUtils::scopedTimer(outputPassTimer);
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			GLUtils::Framebuffer::bindDefault();
 			glClear(GL_COLOR_BUFFER_BIT);
 			glDisable(GL_DEPTH_TEST);
 			m_outputShader.use();
@@ -275,11 +273,7 @@ public:
 private:
 	bool initIndexFramebuffer(const unsigned int& width, const unsigned int& height)
 	{
-		// TODO: RAII
-		if (!m_idFBO)
-			glGenFramebuffers(1, &m_idFBO);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, m_idFBO);
+		m_idFBO.bind();
 		glViewport(0, 0, width, height); // again?
 
 		// create integer id texture
@@ -317,20 +311,17 @@ private:
 		}
 
 		// unbind framebuffer before we return
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		GLUtils::Framebuffer::bindDefault();
 		return success;
 	}
 
-	// TODO: thin wrapper to RAII opengl FBO
-	GLuint m_idFBO;
+	const GLUtils::Framebuffer m_idFBO;
 
 	const GLUtils::Texture m_idTexture, m_depthTexture, m_colourTexture;
 
-	GLUtils::ShaderProgram m_visComputeShader;
-	GLUtils::ShaderProgram m_pointsShader;
-	GLUtils::ShaderProgram m_outputShader;
+	const GLUtils::ShaderProgram m_visComputeShader, m_pointsShader, m_outputShader;
 
-	GLuint m_pointCloudVAO;
+	const GLUtils::VAO m_pointCloudVAO;
 
 	const glm::mat4 m_modelMat; // Model matrix to roughly center and orient the point cloud...
 

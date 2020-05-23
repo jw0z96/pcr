@@ -7,6 +7,7 @@ namespace
 {
 	constexpr double TWO_PI = 2.0f * M_PI;
 	constexpr double HALF_PI = 0.5f * M_PI;
+	static const glm::vec3 s_worldUp(0.0, 1.0, 0.0); // glm::vec3() is non-constexpr?
 } // namespace
 
 OrbitalCamera::OrbitalCamera() :
@@ -19,9 +20,9 @@ OrbitalCamera::OrbitalCamera() :
 void OrbitalCamera::processInput(const SDL_Event& event)
 {
 	// mouse sensitivity multiplier for the camera rotation control
-	static constexpr float s_mouseSensitivity = 0.001f;
+	constexpr float s_mouseSensitivity = 0.001f;
 	// scroll sensitivity multiplier for the camera distance control
-	static constexpr float s_scrollSensitivity = 1.0f;
+	constexpr float s_scrollSensitivity = 1.0f;
 
 	switch (event.type)
 	{
@@ -53,8 +54,6 @@ const glm::mat4 OrbitalCamera::calculateView() const
 {
 	glm::vec3 viewPoint(
 		glm::sin(m_theta) * glm::cos(m_phi), glm::sin(m_phi), glm::cos(m_theta) * glm::cos(m_phi));
-
-	static const glm::vec3 s_worldUp(0.0, 1.0, 0.0); // glm::vec3() is non-constexpr?
 	return glm::lookAt(viewPoint * m_distance, m_target, s_worldUp);
 }
 

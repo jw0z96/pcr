@@ -29,9 +29,9 @@ namespace GLUtils
 		{
 			GLint tex = 0;
 			glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &tex); // also GL_READ_FRAMEBUFFER_BINDING
-			if (!tex)
+			if (tex == 0)
 			{
-				// TODO: Throw an error
+				// TODO: Throw an error, we can't attach to the default framebuffer
 				return;
 			}
 

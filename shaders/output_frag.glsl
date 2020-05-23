@@ -9,6 +9,8 @@ layout(std430, binding = 0) buffer visibilityBuffer
 	uint visibilities[];
 };
 
+// uniform bool progressive;
+
 in vec2 uv;
 
 out vec4 fragColour;
@@ -43,7 +45,7 @@ void main()
 	if (depth < 1.0f)
 	{
 		const int pointId = texture(idTexture, uv).r;
-		setBufferBitAtIndex(pointId);
+		setBufferBitAtIndex(pointId); // this costs 5ms a frame
 		const int colourId = pointId * 3;
 		const float r = texelFetch(colTexture, colourId + 0).r / 255.0f;
 		const float g = texelFetch(colTexture, colourId + 1).r / 255.0f;

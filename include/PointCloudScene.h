@@ -49,4 +49,7 @@ private:
 	GLuint m_numPointsTotal;
 
 	bool m_doProgressive;
+	unsigned int m_fillIteration;
+	int m_fillRate;
+
 };

@@ -19,7 +19,7 @@ PointCloudScene::PointCloudScene() :
 						   glm::rotate(glm::mat4(1.0), 3.14159f / 2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
 						   glm::vec3(0.0f, 0.0f, -5.0f))),
 	m_pointsBuffer(), m_colBuffer(), m_visBuffer(), m_elementBuffer(), m_indirectElementsBuffer(), m_camera(), m_computeDispatchCount(0), m_numPointsVisible(0), m_numPointsTotal(0),
-	m_doProgressive(false)
+	m_doProgressive(false), m_fillIteration(0), m_fillRate(1000)
 {
 	// enable programmable point size in vertex shaders, no better place to put this?
 	glEnable(GL_PROGRAM_POINT_SIZE);
@@ -199,8 +199,21 @@ void PointCloudScene::drawScene()
 			// dispatch point draw
 			if (m_doProgressive)
 			{
-				// glDrawElements(GL_POINTS, m_numPointsVisible, GL_UNSIGNED_INT, nullptr);
-				glDrawElementsIndirect(GL_POINTS, GL_UNSIGNED_INT, nullptr);
+				{
+					GLUtils::scopedTimer(reprojectDrawTimer);
+					glDrawElementsIndirect(GL_POINTS, GL_UNSIGNED_INT, nullptr);
+				}
+
+				// TODO: clean this up, it should look better if the VBO is shuffled
+				{
+					GLUtils::scopedTimer(randomFillDrawTimer);
+					// make sure this doesn't overflow...
+					glDrawArrays(GL_POINTS, m_fillRate * m_fillIteration++, m_fillRate);
+					if ((m_fillIteration * m_fillRate) > m_numPointsTotal)
+					{
+						m_fillIteration = 0;
+					}
+				}
 			}
 			else
 			{
@@ -228,11 +241,11 @@ void PointCloudScene::drawGUI()
 	ImGui::Begin("Controls");
 	ImGui::Checkbox("Progressive Render", &m_doProgressive);
 
-	// if (m_doProgressive)
-	// {
-	// 	ImGui::Text("Fill Rate (per frame):");
-	// 	ImGui::SliderInt("", &fillRate, 0, maxFillRate);
-	// }
+	if (m_doProgressive)
+	{
+		ImGui::Text("Fill Rate (per frame):");
+		ImGui::SliderInt("", &m_fillRate, 0, (m_numPointsTotal / 10)); // this seems like a reasonable limit
+	}
 
 	ImGui::Separator();
 
@@ -244,20 +257,25 @@ void PointCloudScene::drawGUI()
 
 	const float frameTime = GLUtils::getElapsed(newFrameTimer);
 	ImGui::Text("Frame time: %.1f ms (%.1f fps)", frameTime, 1000.0f / frameTime);
-	ImGui::Text("	ID Pass time: %.1f ms", GLUtils::getElapsed(idPassTimer));
+	ImGui::Text("\tID Pass time: %.1f ms", GLUtils::getElapsed(idPassTimer));
 	if (m_doProgressive)
 	{
-		ImGui::Text("		Index Compute time: %.1f ms", GLUtils::getElapsed(indexComputeTimer));
+		ImGui::Text("\t\tIndex Compute time: %.1f ms", GLUtils::getElapsed(indexComputeTimer));
 		ImGui::Text(
-			"			Index Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
+			"\t\t\tIndex Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
 		ImGui::Text(
-			"			Index Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
+			"\t\t\tIndex Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
 		ImGui::Text(
-			"			Index Compute Dispatch time: %.1f ms",
+			"\t\t\tIndex Compute Dispatch time: %.1f ms",
 			GLUtils::getElapsed(indexComputeDispatchTimer));
 	}
-	ImGui::Text("		Points Draw time: %.1f ms", GLUtils::getElapsed(pointsDrawTimer));
-	ImGui::Text("	Output Pass time: %.1f ms", GLUtils::getElapsed(outputPassTimer));
+	ImGui::Text("\t\tPoints Draw time: %.1f ms", GLUtils::getElapsed(pointsDrawTimer));
+	if (m_doProgressive)
+	{
+		ImGui::Text("\t\tReproject Draw time: %.1f ms", GLUtils::getElapsed(reprojectDrawTimer));
+		ImGui::Text("\t\tRandom Fill Draw time: %.1f ms", GLUtils::getElapsed(randomFillDrawTimer));
+	}
+	ImGui::Text("\tOutput Pass time: %.1f ms", GLUtils::getElapsed(outputPassTimer));
 	ImGui::End();
 }
 

@@ -19,6 +19,9 @@ namespace GLUtils
 		// not worth the hassle to share their ownership
 		Buffer(const Buffer &) = delete;
 		Buffer &operator=(const Buffer &) = delete;
+		// ...and move constructor, move assignment
+		Buffer(Buffer&&) = delete;
+		Buffer& operator=(Buffer&&) = delete;
 
 		inline void bindAs(const GLenum &type) const { glBindBuffer(type, m_id); }
 

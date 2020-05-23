@@ -19,6 +19,9 @@ namespace GLUtils
 		// not worth the hassle to share their ownership
 		VAO(const VAO &) = delete;
 		VAO &operator=(const VAO &) = delete;
+		// ...and move constructor, move assignment
+		VAO(VAO&&) = delete;
+		VAO& operator=(VAO&&) = delete;
 
 		inline void bind() const { glBindVertexArray(m_id); }
 

@@ -16,10 +16,6 @@ public:
 
 	// ~PointCloudScene(); // let the compiler do it
 
-	// Disable copy constructor and assignment operator, since we're managing external resources
-	PointCloudScene(const PointCloudScene&) = delete;
-	PointCloudScene& operator=(const PointCloudScene&) = delete;
-
 	bool loadPointCloud(const char* filepath);
 
 	void processEvent(const SDL_Event& event);

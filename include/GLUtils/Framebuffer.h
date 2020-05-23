@@ -19,6 +19,9 @@ namespace GLUtils
 		// not worth the hassle to share their ownership
 		Framebuffer(const Framebuffer &) = delete;
 		Framebuffer &operator=(const Framebuffer &) = delete;
+		// ...and move constructor, move assignment
+		Framebuffer(Framebuffer&&) = delete;
+		Framebuffer& operator=(Framebuffer&&) = delete;
 
 		inline void bind() const { glBindFramebuffer(GL_FRAMEBUFFER, m_id); }
 

@@ -28,6 +28,9 @@ namespace GLUtils
 		// not worth the hassle to share their ownership
 		ShaderProgram(const ShaderProgram&) = delete;
 		ShaderProgram& operator=(const ShaderProgram&) = delete;
+		// ...and move constructor, move assignment
+		ShaderProgram(ShaderProgram&&) = delete;
+		ShaderProgram& operator=(ShaderProgram&&) = delete;
 
 		void use() const;
 

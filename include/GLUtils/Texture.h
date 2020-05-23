@@ -19,6 +19,9 @@ namespace GLUtils
 		// not worth the hassle to share their ownership
 		Texture(const Texture &) = delete;
 		Texture &operator=(const Texture &) = delete;
+		// ...and move constructor, move assignment
+		Texture(Texture&&) = delete;
+		Texture& operator=(Texture&&) = delete;
 
 		inline void bindAs(const GLenum &type) const { glBindTexture(type, m_id); }
 

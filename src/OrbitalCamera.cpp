@@ -12,9 +12,8 @@ namespace
 
 OrbitalCamera::OrbitalCamera() :
 	m_theta(0.0f), m_phi(0.0f), m_target(0.0f), m_distance(20.0f), m_viewMat(std::nullopt), m_fov(45.0f),
-	m_aspect(1.0f), m_nearClip(1.0f), m_farClip(100.0f), m_projectionMat(1.0f)
+	m_aspect(1.0f), m_nearClip(1.0f), m_farClip(100.0f), m_projectionMat(std::nullopt)
 {
-	updateProjection();
 }
 
 void OrbitalCamera::processInput(const SDL_Event& event)
@@ -57,7 +56,7 @@ const glm::mat4 OrbitalCamera::calculateView() const
 	return glm::lookAt(viewPoint * m_distance, m_target, s_worldUp);
 }
 
-void OrbitalCamera::updateProjection()
+const glm::mat4 OrbitalCamera::calculateProjection()
 {
-	m_projectionMat = glm::perspective(glm::radians(m_fov), m_aspect, m_nearClip, m_farClip);
+	return glm::perspective(glm::radians(m_fov), m_aspect, m_nearClip, m_farClip);
 }

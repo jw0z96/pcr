@@ -31,34 +31,43 @@ public:
 
 	// Projection Matrix methods
 	// FOV angle in degrees
-	inline void setFOV(float fov) { m_fov = fov; }
+	inline void setFOV(float fov)
+	{
+		m_fov = fov;
+		m_projectionMat.reset();
+	}
 
 	// Make sure to call this when the aspect ratio of the window changes
 	inline void setAspect(float aspect)
 	{
 		m_aspect = aspect;
-		updateProjection();
+		m_projectionMat.reset();
 	}
 	inline void setAspect(float width, float height)
 	{
 		m_aspect = width / height;
-		updateProjection();
+		m_projectionMat.reset();
 	}
 
 	inline void setNearFarClip(float near, float far)
 	{
 		m_nearClip = near;
 		m_farClip = far;
+		m_projectionMat.reset();
 	}
 
-	inline glm::mat4 getProjection() const { return m_projectionMat; }
+	inline glm::mat4 getProjection() const
+	{
+		return m_projectionMat.has_value() ? m_projectionMat.value() :
+											 m_projectionMat.emplace(calculateProjection());
+	}
 
 private:
 	// Recalculate the view matrix
 	const glm::mat4 calculateView() const;
 
 	// Recalculate the projection matrix
-	void updateProjection();
+	const glm::mat4 calculateProjection() const;
 
 	// View Matrix variables
 	// theta being the azimuthal angle, phi being altitude/elevation angle, in radians
@@ -73,8 +82,7 @@ private:
 	float m_distance;
 
 	// The actual view matrix... we make this a std::optional so that we can use std::optional's nullopt as a
-	// 'dirty' state flag for when it needs to be recalculated, note that we don't do the same for projection,
-	// since we can't modify that currently. Mutable so that the 'getView' is still const...
+	// 'dirty' state flag for when it needs to be recalculated
 	mutable std::optional<const glm::mat4> m_viewMat;
 
 	// Projection Matrix variables
@@ -87,6 +95,6 @@ private:
 	// projection near and far clipping distances
 	float m_nearClip, m_farClip;
 
-	// the actual projection matrix...
-	glm::mat4 m_projectionMat;
+	// The actual projection matrix... mutable std::optional as above
+	mutable std::optional<const glm::mat4> m_projectionMat;
 };

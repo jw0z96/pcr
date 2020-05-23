@@ -95,14 +95,10 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	m_colourTexture.bindAs(GL_TEXTURE_BUFFER);
 	m_colBuffer.attachToTextureBuffer(GL_R8UI);
 
-	// glActiveTexture(GL_TEXTURE1);
-	// glBindTexture(GL_TEXTURE_BUFFER, m_colourTexture);
-	// glTexBuffer(GL_TEXTURE_BUFFER, GL_R8UI, m_colBuffer);
-	// glBindBuffer(GL_TEXTURE_BUFFER, 0);
 	// optionally, enable it as a vertex attribute
-	// glBindBuffer(GL_ARRAY_BUFFER, m_colBuffer);
+	// m_colBuffer.bindAs(GL_ARRAY_BUFFER);
 	// glEnableVertexAttribArray(1);
-	// glVertexAttribIPointer(1, 3, GL_UNSIGNED_BYTE, 3 * sizeof(unsigned char), (void*)0); // sized type
+	// glVertexAttribIPointer(1, 3, GL_UNSIGNED_BYTE, 3 * sizeof(unsigned char), nullptr); // sized type
 
 	// generate an SSBO for the visibility
 	m_visBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);

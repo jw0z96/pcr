@@ -50,6 +50,14 @@ PointCloudScene::PointCloudScene() :
 
 	// set up indirect drawing parameters buffer, the first element (count) will also be mapped to an atomic counter
 	// in the compute shader
+	struct DrawElementsIndirectCommand
+	{
+		GLuint count;
+		GLuint primCount;
+		GLuint firstIndex;
+		GLint baseVertex;
+		GLuint reservedMustBeZero;
+	};
 	const DrawElementsIndirectCommand indirectElements = {0, 1, 0, 0, 0};
 	m_indirectElementsBuffer.bindAs(GL_DRAW_INDIRECT_BUFFER);
 	glBufferData(GL_DRAW_INDIRECT_BUFFER, sizeof(indirectElements), &indirectElements, GL_DYNAMIC_DRAW);

@@ -27,14 +27,6 @@ public:
 	void drawGUI();
 
 private:
-	struct DrawElementsIndirectCommand
-	{
-		GLuint count;
-		GLuint primCount;
-		GLuint firstIndex;
-		GLint baseVertex;
-		GLuint reservedMustBeZero;
-	};
 
 	bool initIndexFramebuffer(const unsigned int& width, const unsigned int& height);
 

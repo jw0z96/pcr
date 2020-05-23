@@ -24,7 +24,6 @@ PointCloudScene::PointCloudScene() :
 	// enable programmable point size in vertex shaders, no better place to put this?
 	glEnable(GL_PROGRAM_POINT_SIZE);
 
-	// TODO: initialize FBO & textures?
 	setFramebufferParams(800, 600); // these constants match those in main.cpp
 
 	// Set constant uniforms on the shaders

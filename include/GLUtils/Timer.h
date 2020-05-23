@@ -31,7 +31,6 @@ namespace GLUtils
 	// TODO: what if someone calls this twice with the same name?
 #define scopedTimer(name) _scopedTimer _timer_##name(GLUtils::constStringHash(#name))
 
-
 	// Get a timer's elapsed value given it's hash, prefer the 'named' macro below to do compile time hashing
 	float _getElapsed(const size_t& hash);
 #define getElapsed(name) _getElapsed(GLUtils::constStringHash(#name))

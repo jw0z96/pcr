@@ -31,6 +31,15 @@ public:
 	void drawGUI();
 
 private:
+	struct DrawElementsIndirectCommand
+	{
+		GLuint count;
+		GLuint primCount;
+		GLuint firstIndex;
+		GLint baseVertex;
+		GLuint reservedMustBeZero;
+	};
+
 	bool initIndexFramebuffer(const unsigned int& width, const unsigned int& height);
 
 	const GLUtils::Framebuffer m_idFBO;
@@ -43,7 +52,7 @@ private:
 
 	const glm::mat4 m_modelMat; // Model matrix to roughly center and orient the point cloud...
 
-	const GLUtils::Buffer m_pointsBuffer, m_colBuffer, m_visBuffer, m_elementBuffer, m_counterBuffer;
+	const GLUtils::Buffer m_pointsBuffer, m_colBuffer, m_visBuffer, m_elementBuffer, m_indirectElementsBuffer;
 
 	OrbitalCamera m_camera;
 

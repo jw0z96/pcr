@@ -18,8 +18,8 @@ PointCloudScene::PointCloudScene() :
 	m_pointCloudVAO(), m_modelMat(glm::translate(
 						   glm::rotate(glm::mat4(1.0), 3.14159f / 2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
 						   glm::vec3(0.0f, 0.0f, -5.0f))),
-	m_pointsBuffer(), m_colBuffer(), m_visBuffer(), m_elementBuffer(), m_counterBuffer(), m_camera(),
-	m_computeDispatchCount(0), m_numPointsVisible(0), m_numPointsTotal(0), m_doProgressive(false)
+	m_pointsBuffer(), m_colBuffer(), m_visBuffer(), m_elementBuffer(), m_indirectElementsBuffer(), m_camera(), m_computeDispatchCount(0), m_numPointsVisible(0), m_numPointsTotal(0),
+	m_doProgressive(false)
 {
 	// enable programmable point size in vertex shaders, no better place to put this?
 	glEnable(GL_PROGRAM_POINT_SIZE);
@@ -33,8 +33,8 @@ PointCloudScene::PointCloudScene() :
 		glm::value_ptr(m_camera.getProjection()));
 	glUniformMatrix4fv(m_pointsShader.getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(m_modelMat));
 
-	// TODO: map out texture units properly
 	m_outputShader.use();
+	// TODO: map out texture units properly
 	// use texture unit 0 for the depth texture
 	glActiveTexture(GL_TEXTURE0);
 	m_idTexture.bindAs(GL_TEXTURE_2D);
@@ -48,11 +48,12 @@ PointCloudScene::PointCloudScene() :
 	m_colourTexture.bindAs(GL_TEXTURE_BUFFER);
 	glUniform1i(m_outputShader.getUniformLocation("colTexture"), 2);
 
-	// set up atomic counter
-	m_counterBuffer.bindAs(GL_ATOMIC_COUNTER_BUFFER);
-	const GLuint counterValue = 0;
-	glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &counterValue, GL_DYNAMIC_DRAW);
-	m_counterBuffer.bindAsIndexed(GL_ATOMIC_COUNTER_BUFFER, 0);
+	// set up indirect drawing parameters buffer, the first element (count) will also be mapped to an atomic counter
+	// in the compute shader
+	const DrawElementsIndirectCommand indirectElements = {0, 1, 0, 0, 0};
+	m_indirectElementsBuffer.bindAs(GL_DRAW_INDIRECT_BUFFER);
+	glBufferData(GL_DRAW_INDIRECT_BUFFER, sizeof(indirectElements), &indirectElements, GL_DYNAMIC_DRAW);
+	m_indirectElementsBuffer.bindAsIndexed(GL_ATOMIC_COUNTER_BUFFER, 0);
 }
 
 bool PointCloudScene::loadPointCloud(const char* filepath)
@@ -159,22 +160,23 @@ void PointCloudScene::drawScene()
 		if (m_doProgressive)
 		{
 			GLUtils::scopedTimer(indexComputeTimer);
-			// use a compute shader to count the elements in the visibility buffer
-			m_visComputeShader.use();
-			{
-				GLUtils::scopedTimer(indexComputeDispatchTimer);
-				glDispatchCompute(m_computeDispatchCount, 1, 1);
-			}
-			// get the atomic counter value
+			// get the atomic counter value, we do this before dispatching the compute shader to avoid a
+			// stall(?) that happens when trying to read immediately after dispatch
 			{
 				GLUtils::scopedTimer(indexCounterReadTimer);
-				glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), &m_numPointsVisible);
+				glGetBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &m_numPointsVisible);
 			}
 			// reset the counter value
 			{
 				GLUtils::scopedTimer(indexCounterResetTimer);
 				static const GLuint zero = 0;
-				glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &zero, GL_DYNAMIC_DRAW);
+				glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
+			}
+			// use a compute shader to count the elements in the visibility buffer
+			m_visComputeShader.use();
+			{
+				GLUtils::scopedTimer(indexComputeDispatchTimer);
+				glDispatchCompute(m_computeDispatchCount, 1, 1);
 			}
 		}
 
@@ -193,7 +195,8 @@ void PointCloudScene::drawScene()
 			// dispatch point draw
 			if (m_doProgressive)
 			{
-				glDrawElements(GL_POINTS, m_numPointsVisible, GL_UNSIGNED_INT, nullptr);
+				// glDrawElements(GL_POINTS, m_numPointsVisible, GL_UNSIGNED_INT, nullptr);
+				glDrawElementsIndirect(GL_POINTS, GL_UNSIGNED_INT, nullptr);
 			}
 			else
 			{
@@ -209,6 +212,7 @@ void PointCloudScene::drawScene()
 		glClear(GL_COLOR_BUFFER_BIT);
 		glDisable(GL_DEPTH_TEST);
 		m_outputShader.use();
+		// glUniform1i(m_outputShader.getUniformLocation("progressive"), m_doProgressive);
 		// The vertex shader will create a screen space quad, so no need to bind a different VAO & VBO
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
@@ -241,12 +245,12 @@ void PointCloudScene::drawGUI()
 	{
 		ImGui::Text("		Index Compute time: %.1f ms", GLUtils::getElapsed(indexComputeTimer));
 		ImGui::Text(
-			"			Index Compute Dispatch time: %.1f ms",
-			GLUtils::getElapsed(indexComputeDispatchTimer));
-		ImGui::Text(
 			"			Index Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
 		ImGui::Text(
 			"			Index Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
+		ImGui::Text(
+			"			Index Compute Dispatch time: %.1f ms",
+			GLUtils::getElapsed(indexComputeDispatchTimer));
 	}
 	ImGui::Text("		Points Draw time: %.1f ms", GLUtils::getElapsed(pointsDrawTimer));
 	ImGui::Text("	Output Pass time: %.1f ms", GLUtils::getElapsed(outputPassTimer));

@@ -250,7 +250,7 @@ void PointCloudScene::drawGUI()
 	ImGui::Separator();
 
 	ImGui::Text(
-		"Drawing %u / %u points (%.2f%%)", m_doProgressive ? m_numPointsVisible : m_numPointsTotal,
+		"Drawing %u / %u points (%.2f%%)", m_doProgressive ? (m_numPointsVisible + m_fillRate) : m_numPointsTotal,
 		m_numPointsTotal, m_doProgressive ? (m_numPointsVisible * 100.0f / m_numPointsTotal) : 100.0f);
 
 	ImGui::Separator();
@@ -272,8 +272,8 @@ void PointCloudScene::drawGUI()
 	ImGui::Text("\t\tPoints Draw time: %.1f ms", GLUtils::getElapsed(pointsDrawTimer));
 	if (m_doProgressive)
 	{
-		ImGui::Text("\t\tReproject Draw time: %.1f ms", GLUtils::getElapsed(reprojectDrawTimer));
-		ImGui::Text("\t\tRandom Fill Draw time: %.1f ms", GLUtils::getElapsed(randomFillDrawTimer));
+		ImGui::Text("\t\t\tReproject Draw time: %.1f ms", GLUtils::getElapsed(reprojectDrawTimer));
+		ImGui::Text("\t\t\tRandom Fill Draw time: %.1f ms", GLUtils::getElapsed(randomFillDrawTimer));
 	}
 	ImGui::Text("\tOutput Pass time: %.1f ms", GLUtils::getElapsed(outputPassTimer));
 	ImGui::End();

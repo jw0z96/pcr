@@ -56,7 +56,7 @@ const glm::mat4 OrbitalCamera::calculateView() const
 	return glm::lookAt(viewPoint * m_distance, m_target, s_worldUp);
 }
 
-const glm::mat4 OrbitalCamera::calculateProjection()
+const glm::mat4 OrbitalCamera::calculateProjection() const
 {
 	return glm::perspective(glm::radians(m_fov), m_aspect, m_nearClip, m_farClip);
 }

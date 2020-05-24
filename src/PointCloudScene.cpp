@@ -8,6 +8,9 @@
 #include <tinyply/tinyply.h>
 #include "ply_utils.h"
 
+#include <algorithm>
+#include <random>
+
 PointCloudScene::PointCloudScene() :
 	m_idFBO(), m_idTexture(), m_depthTexture(), m_colourTexture(),
 	m_visComputeShader({{GL_COMPUTE_SHADER, "shaders/visibility_comp.glsl"}}),
@@ -18,8 +21,9 @@ PointCloudScene::PointCloudScene() :
 	m_pointCloudVAO(), m_modelMat(glm::translate(
 						   glm::rotate(glm::mat4(1.0), 3.14159f / 2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
 						   glm::vec3(0.0f, 0.0f, -5.0f))),
-	m_pointsBuffer(), m_colBuffer(), m_visBuffer(), m_elementBuffer(), m_indirectElementsBuffer(), m_camera(), m_computeDispatchCount(0), m_numPointsVisible(0), m_numPointsTotal(0),
-	m_doProgressive(false), m_fillIteration(0), m_fillRate(1000)
+	m_pointsBuffer(), m_colBuffer(), m_visBuffer(), m_elementBuffer(), m_shuffledBuffer(),
+	m_indirectElementsBuffer(), m_camera(), m_computeDispatchCount(0), m_numPointsVisible(0),
+	m_numPointsTotal(0), m_doProgressive(true), m_doShuffle(true), m_fillStartIndex(0), m_fillRate(1000)
 {
 	// enable programmable point size in vertex shaders, no better place to put this?
 	glEnable(GL_PROGRAM_POINT_SIZE);
@@ -48,8 +52,8 @@ PointCloudScene::PointCloudScene() :
 	m_colourTexture.bindAs(GL_TEXTURE_BUFFER);
 	glUniform1i(m_outputShader.getUniformLocation("colTexture"), 2);
 
-	// set up indirect drawing parameters buffer, the first element (count) will also be mapped to an atomic counter
-	// in the compute shader
+	// set up indirect drawing parameters buffer, the first element (count) will also be mapped to an atomic
+	// counter in the compute shader
 	struct DrawElementsIndirectCommand
 	{
 		GLuint count;
@@ -120,6 +124,16 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	// Also bind it as a SSBO so we can use it in the compute shader
 	m_elementBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
 	m_elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
+
+	// generate a buffer of shuffled indices
+	std::vector<GLuint> shuffledIndices(m_numPointsTotal);
+	std::iota(shuffledIndices.begin(), shuffledIndices.end(), 0);
+	std::random_device rd;
+	std::mt19937 g(rd());
+	std::shuffle(shuffledIndices.begin(), shuffledIndices.end(), g);
+	m_shuffledBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
+	glBufferData(
+		GL_ELEMENT_ARRAY_BUFFER, m_numPointsTotal * sizeof(GLuint), shuffledIndices.data(), GL_STATIC_DRAW);
 
 	std::cout << "gl error: " << glGetError() << "\n"; // TODO: A proper macro for glErrors
 
@@ -201,18 +215,29 @@ void PointCloudScene::drawScene()
 			{
 				{
 					GLUtils::scopedTimer(reprojectDrawTimer);
+					m_elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 					glDrawElementsIndirect(GL_POINTS, GL_UNSIGNED_INT, nullptr);
 				}
 
 				// TODO: clean this up, it should look better if the VBO is shuffled
 				{
 					GLUtils::scopedTimer(randomFillDrawTimer);
-					// make sure this doesn't overflow...
-					glDrawArrays(GL_POINTS, m_fillRate * m_fillIteration++, m_fillRate);
-					if ((m_fillIteration * m_fillRate) > m_numPointsTotal)
+
+					if (m_doShuffle)
 					{
-						m_fillIteration = 0;
+						m_shuffledBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
+						// make sure this doesn't overflow...
+						glDrawElementsBaseVertex(
+							GL_POINTS, m_fillRate, GL_UNSIGNED_INT, nullptr, m_fillStartIndex);
 					}
+					else
+					{
+						glDrawArrays(GL_POINTS, m_fillStartIndex, m_fillRate);
+					}
+
+					m_fillStartIndex = ((m_fillStartIndex + m_fillRate) > m_numPointsTotal) ?
+						0 :
+						m_fillStartIndex + m_fillRate;
 				}
 			}
 			else
@@ -243,6 +268,7 @@ void PointCloudScene::drawGUI()
 
 	if (m_doProgressive)
 	{
+		ImGui::Checkbox("Shuffle Fill", &m_doShuffle);
 		ImGui::Text("Fill Rate (per frame):");
 		ImGui::SliderInt("", &m_fillRate, 0, (m_numPointsTotal / 10)); // this seems like a reasonable limit
 	}
@@ -250,8 +276,9 @@ void PointCloudScene::drawGUI()
 	ImGui::Separator();
 
 	ImGui::Text(
-		"Drawing %u / %u points (%.2f%%)", m_doProgressive ? (m_numPointsVisible + m_fillRate) : m_numPointsTotal,
-		m_numPointsTotal, m_doProgressive ? (m_numPointsVisible * 100.0f / m_numPointsTotal) : 100.0f);
+		"Drawing %u / %u points (%.2f%%)",
+		m_doProgressive ? (m_numPointsVisible + m_fillRate) : m_numPointsTotal, m_numPointsTotal,
+		m_doProgressive ? (m_numPointsVisible * 100.0f / m_numPointsTotal) : 100.0f);
 
 	ImGui::Separator();
 
@@ -261,13 +288,10 @@ void PointCloudScene::drawGUI()
 	if (m_doProgressive)
 	{
 		ImGui::Text("\t\tIndex Compute time: %.1f ms", GLUtils::getElapsed(indexComputeTimer));
+		ImGui::Text("\t\t\tIndex Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
+		ImGui::Text("\t\t\tIndex Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
 		ImGui::Text(
-			"\t\t\tIndex Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
-		ImGui::Text(
-			"\t\t\tIndex Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
-		ImGui::Text(
-			"\t\t\tIndex Compute Dispatch time: %.1f ms",
-			GLUtils::getElapsed(indexComputeDispatchTimer));
+			"\t\t\tIndex Compute Dispatch time: %.1f ms", GLUtils::getElapsed(indexComputeDispatchTimer));
 	}
 	ImGui::Text("\t\tPoints Draw time: %.1f ms", GLUtils::getElapsed(pointsDrawTimer));
 	if (m_doProgressive)

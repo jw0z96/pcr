@@ -27,7 +27,6 @@ public:
 	void drawGUI();
 
 private:
-
 	bool initIndexFramebuffer(const unsigned int& width, const unsigned int& height);
 
 	const GLUtils::Framebuffer m_idFBO;
@@ -40,7 +39,8 @@ private:
 
 	const glm::mat4 m_modelMat; // Model matrix to roughly center and orient the point cloud...
 
-	const GLUtils::Buffer m_pointsBuffer, m_colBuffer, m_visBuffer, m_elementBuffer, m_indirectElementsBuffer;
+	const GLUtils::Buffer m_pointsBuffer, m_colBuffer, m_visBuffer, m_elementBuffer, m_shuffledBuffer,
+		m_indirectElementsBuffer;
 
 	OrbitalCamera m_camera;
 
@@ -48,8 +48,7 @@ private:
 	GLuint m_numPointsVisible;
 	GLuint m_numPointsTotal;
 
-	bool m_doProgressive;
-	unsigned int m_fillIteration;
+	bool m_doProgressive, m_doShuffle;
+	unsigned int m_fillStartIndex;
 	int m_fillRate;
-
 };

@@ -181,28 +181,6 @@ void PointCloudScene::drawScene()
 	{
 		GLUtils::scopedTimer(idPassTimer);
 
-		// ID Compute EBO pass
-		if (m_doProgressive)
-		{
-			GLUtils::scopedTimer(indexComputeTimer);
-			// get the atomic counter value, we do this before dispatching the compute shader to avoid a
-			// stall(?) that happens when trying to read immediately after dispatch
-
-			// // reset the counter value
-			// {
-			// 	GLUtils::scopedTimer(indexCounterResetTimer);
-			// 	static const GLuint zero = 0;
-			// 	glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
-			// }
-			// use a compute shader to count the elements in the visibility buffer
-			// m_visComputeShader.use();
-			{
-				GLUtils::scopedTimer(indexComputeDispatchTimer);
-				// glDispatchCompute(m_computeDispatchCount, 1, 1);
-				// glDispatchCompute(65535, 1, 1);
-			}
-		}
-
 		// ID Draw Pass
 		{
 			GLUtils::scopedTimer(pointsDrawTimer);
@@ -227,15 +205,13 @@ void PointCloudScene::drawScene()
 					m_elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 					glDrawElementsIndirect(GL_POINTS, GL_UNSIGNED_INT, nullptr);
 				}
-				// reset the counter value
-				{
-					GLUtils::scopedTimer(indexCounterResetTimer);
-					static const GLuint zero = 0;
-					glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
-				}
+				// // reset the counter value
+				// {
+				// 	GLUtils::scopedTimer(indexCounterResetTimer);
+				// 	static const GLuint zero = 0;
+				// 	glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
+				// }
 
-
-				// TODO: clean this up, it should look better if the VBO is shuffled
 				{
 					GLUtils::scopedTimer(randomFillDrawTimer);
 
@@ -260,6 +236,14 @@ void PointCloudScene::drawScene()
 			{
 				glDrawArrays(GL_POINTS, 0, m_numPointsTotal);
 			}
+
+			// reset the counter value
+			{
+				GLUtils::scopedTimer(indexCounterResetTimer);
+				static const GLuint zero = 0;
+				glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
+			}
+
 		}
 	}
 
@@ -301,18 +285,12 @@ void PointCloudScene::drawGUI()
 	const float frameTime = GLUtils::getElapsed(newFrameTimer);
 	ImGui::Text("Frame time: %.1f ms (%.1f fps)", frameTime, 1000.0f / frameTime);
 	ImGui::Text("\tID Pass time: %.1f ms", GLUtils::getElapsed(idPassTimer));
-	if (m_doProgressive)
-	{
-		ImGui::Text("\t\tIndex Compute time: %.1f ms", GLUtils::getElapsed(indexComputeTimer));
-		ImGui::Text("\t\t\tIndex Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
-		ImGui::Text("\t\t\tIndex Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
-		ImGui::Text(
-			"\t\t\tIndex Compute Dispatch time: %.1f ms", GLUtils::getElapsed(indexComputeDispatchTimer));
-	}
 	ImGui::Text("\t\tPoints Draw time: %.1f ms", GLUtils::getElapsed(pointsDrawTimer));
 	if (m_doProgressive)
 	{
+		ImGui::Text("\t\t\tIndex Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
 		ImGui::Text("\t\t\tReproject Draw time: %.1f ms", GLUtils::getElapsed(reprojectDrawTimer));
+		ImGui::Text("\t\t\tIndex Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
 		ImGui::Text("\t\t\tRandom Fill Draw time: %.1f ms", GLUtils::getElapsed(randomFillDrawTimer));
 	}
 	ImGui::Text("\tOutput Pass time: %.1f ms", GLUtils::getElapsed(outputPassTimer));

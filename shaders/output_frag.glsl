@@ -78,6 +78,7 @@ void main()
 	}
 	else
 	{
-		fragColour = vec4(uv.x, uv.y, 0.0f, 1.0f);
+		// fragColour = vec4(uv.x, uv.y, 0.0f, 1.0f);
+		fragColour = vec4(0.0f, 0.0f, 0.0f, 1.0f);
 	}
 }

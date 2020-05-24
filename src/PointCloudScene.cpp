@@ -66,6 +66,7 @@ PointCloudScene::PointCloudScene() :
 	m_indirectElementsBuffer.bindAs(GL_DRAW_INDIRECT_BUFFER);
 	glBufferData(GL_DRAW_INDIRECT_BUFFER, sizeof(indirectElements), &indirectElements, GL_DYNAMIC_DRAW);
 	m_indirectElementsBuffer.bindAsIndexed(GL_ATOMIC_COUNTER_BUFFER, 0);
+	// m_indirectElementsBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 2);
 }
 
 bool PointCloudScene::loadPointCloud(const char* filepath)
@@ -86,6 +87,10 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_cnt);
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size);
 	m_computeDispatchCount = ceil(numVertsBytes / 4);
+
+	std::cout<<"work_grp_cnt: "<<work_grp_cnt<<"\n";
+	std::cout<<"work_grp_size: "<<work_grp_size<<"\n";
+	std::cout<<"m_computeDispatchCount: "<<m_computeDispatchCount<<"\n";
 
 	// we have to bind a VAO to hold the vertex attributes for the buffers, and the element buffer bindings
 	m_pointCloudVAO.bind();
@@ -130,6 +135,8 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	std::iota(shuffledIndices.begin(), shuffledIndices.end(), 0);
 	std::random_device rd;
 	std::mt19937 g(rd());
+	std::shuffle(shuffledIndices.begin(), shuffledIndices.end(), g);
+	std::shuffle(shuffledIndices.begin(), shuffledIndices.end(), g);
 	std::shuffle(shuffledIndices.begin(), shuffledIndices.end(), g);
 	m_shuffledBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 	glBufferData(
@@ -180,21 +187,19 @@ void PointCloudScene::drawScene()
 			GLUtils::scopedTimer(indexComputeTimer);
 			// get the atomic counter value, we do this before dispatching the compute shader to avoid a
 			// stall(?) that happens when trying to read immediately after dispatch
-			{
-				GLUtils::scopedTimer(indexCounterReadTimer);
-				glGetBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &m_numPointsVisible);
-			}
-			// reset the counter value
-			{
-				GLUtils::scopedTimer(indexCounterResetTimer);
-				static const GLuint zero = 0;
-				glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
-			}
+
+			// // reset the counter value
+			// {
+			// 	GLUtils::scopedTimer(indexCounterResetTimer);
+			// 	static const GLuint zero = 0;
+			// 	glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
+			// }
 			// use a compute shader to count the elements in the visibility buffer
-			m_visComputeShader.use();
+			// m_visComputeShader.use();
 			{
 				GLUtils::scopedTimer(indexComputeDispatchTimer);
-				glDispatchCompute(m_computeDispatchCount, 1, 1);
+				// glDispatchCompute(m_computeDispatchCount, 1, 1);
+				// glDispatchCompute(65535, 1, 1);
 			}
 		}
 
@@ -214,10 +219,21 @@ void PointCloudScene::drawScene()
 			if (m_doProgressive)
 			{
 				{
+					GLUtils::scopedTimer(indexCounterReadTimer);
+					glGetBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &m_numPointsVisible);
+				}
+				{
 					GLUtils::scopedTimer(reprojectDrawTimer);
 					m_elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 					glDrawElementsIndirect(GL_POINTS, GL_UNSIGNED_INT, nullptr);
 				}
+				// reset the counter value
+				{
+					GLUtils::scopedTimer(indexCounterResetTimer);
+					static const GLuint zero = 0;
+					glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
+				}
+
 
 				// TODO: clean this up, it should look better if the VBO is shuffled
 				{

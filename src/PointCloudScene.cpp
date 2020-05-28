@@ -22,7 +22,7 @@ PointCloudScene::PointCloudScene() :
 						   glm::rotate(glm::mat4(1.0), 3.14159f / 2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
 						   glm::vec3(0.0f, 0.0f, -5.0f))),
 	m_pointsBuffer(), m_colBuffer(), m_visBuffer(), m_elementBuffer(), m_shuffledBuffer(),
-	m_indirectElementsBuffer(), m_camera(), m_computeDispatchCountX(800), m_computeDispatchCountY(600), m_numPointsVisible(0),
+	m_indirectElementsBuffer(), m_indirectComputeBuffer(), m_camera(), m_computeDispatchCountX(800), m_computeDispatchCountY(600), m_numPointsVisible(0),
 	m_numPointsTotal(0), m_doProgressive(true), m_doShuffle(true), m_fillStartIndex(0), m_fillRate(1000)
 {
 	// enable programmable point size in vertex shaders, no better place to put this?
@@ -61,19 +61,16 @@ PointCloudScene::PointCloudScene() :
 
 	// set up indirect drawing parameters buffer, the first element (count) will also be mapped to an atomic
 	// counter in the compute shader
-	struct DrawElementsIndirectCommand
-	{
-		GLuint count;
-		GLuint primCount;
-		GLuint firstIndex;
-		GLint baseVertex;
-		GLuint reservedMustBeZero;
-	};
 	const DrawElementsIndirectCommand indirectElements = {0, 1, 0, 0, 0};
 	m_indirectElementsBuffer.bindAs(GL_DRAW_INDIRECT_BUFFER);
 	glBufferData(GL_DRAW_INDIRECT_BUFFER, sizeof(indirectElements), &indirectElements, GL_DYNAMIC_DRAW);
 	m_indirectElementsBuffer.bindAsIndexed(GL_ATOMIC_COUNTER_BUFFER, 0);
 	// m_indirectElementsBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 2);
+
+	// set up indirect compute parameters buffer
+	const DispatchIndirectCommand indirectCompute = {m_computeDispatchCountX, m_computeDispatchCountY, 1};
+	m_indirectComputeBuffer.bindAs(GL_DISPATCH_INDIRECT_BUFFER);
+	glBufferData(GL_DISPATCH_INDIRECT_BUFFER, sizeof(indirectCompute), &indirectCompute, GL_DYNAMIC_DRAW);
 }
 
 bool PointCloudScene::loadPointCloud(const char* filepath)
@@ -173,6 +170,11 @@ void PointCloudScene::setFramebufferParams(const unsigned int& width, const unsi
 		std::cout << "error resizing index framebuffer\n";
 	}
 
+	// set up indirect compute parameters buffer
+	const DispatchIndirectCommand indirectCompute = {width, height, 1};
+	m_indirectComputeBuffer.bindAs(GL_DISPATCH_INDIRECT_BUFFER);
+	glBufferData(GL_DISPATCH_INDIRECT_BUFFER, sizeof(indirectCompute), &indirectCompute, GL_DYNAMIC_DRAW);
+
 	m_computeDispatchCountX = width;
 	m_computeDispatchCountY = height;
 
@@ -204,7 +206,8 @@ void PointCloudScene::drawScene()
 			{
 				GLUtils::scopedTimer(indexComputeDispatchTimer);
 				m_visComputeShader.use();
-				glDispatchCompute(m_computeDispatchCountX, m_computeDispatchCountY, 1);
+				// glDispatchCompute(m_computeDispatchCountX, m_computeDispatchCountY, 1);
+				glDispatchComputeIndirect(0);
 			}
 		}
 

@@ -22,7 +22,7 @@ PointCloudScene::PointCloudScene() :
 						   glm::rotate(glm::mat4(1.0), 3.14159f / 2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
 						   glm::vec3(0.0f, 0.0f, -5.0f))),
 	m_pointsBuffer(), m_colBuffer(), m_visBuffer(), m_elementBuffer(), m_shuffledBuffer(),
-	m_indirectElementsBuffer(), m_camera(), m_computeDispatchCount(0), m_numPointsVisible(0),
+	m_indirectElementsBuffer(), m_camera(), m_computeDispatchCountX(800), m_computeDispatchCountY(600), m_numPointsVisible(0),
 	m_numPointsTotal(0), m_doProgressive(true), m_doShuffle(true), m_fillStartIndex(0), m_fillRate(1000)
 {
 	// enable programmable point size in vertex shaders, no better place to put this?
@@ -37,16 +37,23 @@ PointCloudScene::PointCloudScene() :
 		glm::value_ptr(m_camera.getProjection()));
 	glUniformMatrix4fv(m_pointsShader.getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(m_modelMat));
 
-	m_outputShader.use();
 	// TODO: map out texture units properly
+	m_visComputeShader.use();
+	m_elementBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
+	m_elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
+	m_indirectElementsBuffer.bindAsIndexed(GL_ATOMIC_COUNTER_BUFFER, 0);
+
+	m_outputShader.use();
 	// use texture unit 0 for the depth texture
 	glActiveTexture(GL_TEXTURE0);
 	m_idTexture.bindAs(GL_TEXTURE_2D);
 	glUniform1i(m_outputShader.getUniformLocation("idTexture"), 0);
+	glUniform1i(m_visComputeShader.getUniformLocation("idTexture"), 0);
 	// use texture unit 1 for the depth texture
 	glActiveTexture(GL_TEXTURE1);
 	m_depthTexture.bindAs(GL_TEXTURE_2D);
 	glUniform1i(m_outputShader.getUniformLocation("depthTexture"), 1);
+	glUniform1i(m_visComputeShader.getUniformLocation("depthTexture"), 1);
 	// use texture unit 2 for the colour texture
 	glActiveTexture(GL_TEXTURE2);
 	m_colourTexture.bindAs(GL_TEXTURE_BUFFER);
@@ -86,11 +93,10 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	int work_grp_cnt, work_grp_size;
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_cnt);
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size);
-	m_computeDispatchCount = ceil(numVertsBytes / 4);
+	// m_computeDispatchCount = ceil(numVertsBytes / 4);
 
 	std::cout<<"work_grp_cnt: "<<work_grp_cnt<<"\n";
 	std::cout<<"work_grp_size: "<<work_grp_size<<"\n";
-	std::cout<<"m_computeDispatchCount: "<<m_computeDispatchCount<<"\n";
 
 	// we have to bind a VAO to hold the vertex attributes for the buffers, and the element buffer bindings
 	m_pointCloudVAO.bind();
@@ -136,8 +142,6 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	std::random_device rd;
 	std::mt19937 g(rd());
 	std::shuffle(shuffledIndices.begin(), shuffledIndices.end(), g);
-	std::shuffle(shuffledIndices.begin(), shuffledIndices.end(), g);
-	std::shuffle(shuffledIndices.begin(), shuffledIndices.end(), g);
 	m_shuffledBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 	glBufferData(
 		GL_ELEMENT_ARRAY_BUFFER, m_numPointsTotal * sizeof(GLuint), shuffledIndices.data(), GL_STATIC_DRAW);
@@ -169,6 +173,9 @@ void PointCloudScene::setFramebufferParams(const unsigned int& width, const unsi
 		std::cout << "error resizing index framebuffer\n";
 	}
 
+	m_computeDispatchCountX = width;
+	m_computeDispatchCountY = height;
+
 	GLUtils::Framebuffer::bindDefault();
 	glViewport(0, 0, width, height);
 }
@@ -180,6 +187,26 @@ void PointCloudScene::drawScene()
 	// ID Pass
 	{
 		GLUtils::scopedTimer(idPassTimer);
+
+		if (m_doProgressive)
+		{
+			GLUtils::scopedTimer(indexComputeTimer);
+			{
+				GLUtils::scopedTimer(indexCounterReadTimer);
+				glGetBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &m_numPointsVisible);
+			}
+			// reset the counter value
+			{
+				GLUtils::scopedTimer(indexCounterResetTimer);
+				static const GLuint zero = 0;
+				glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
+			}
+			{
+				GLUtils::scopedTimer(indexComputeDispatchTimer);
+				m_visComputeShader.use();
+				glDispatchCompute(m_computeDispatchCountX, m_computeDispatchCountY, 1);
+			}
+		}
 
 		// ID Draw Pass
 		{
@@ -197,21 +224,12 @@ void PointCloudScene::drawScene()
 			if (m_doProgressive)
 			{
 				{
-					GLUtils::scopedTimer(indexCounterReadTimer);
-					glGetBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &m_numPointsVisible);
-				}
-				{
 					GLUtils::scopedTimer(reprojectDrawTimer);
+					glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_ELEMENT_ARRAY_BARRIER_BIT | GL_ATOMIC_COUNTER_BARRIER_BIT);
+					m_pointsShader.use();
 					m_elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 					glDrawElementsIndirect(GL_POINTS, GL_UNSIGNED_INT, nullptr);
 				}
-				// // reset the counter value
-				// {
-				// 	GLUtils::scopedTimer(indexCounterResetTimer);
-				// 	static const GLuint zero = 0;
-				// 	glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
-				// }
-
 				{
 					GLUtils::scopedTimer(randomFillDrawTimer);
 
@@ -236,14 +254,6 @@ void PointCloudScene::drawScene()
 			{
 				glDrawArrays(GL_POINTS, 0, m_numPointsTotal);
 			}
-
-			// reset the counter value
-			{
-				GLUtils::scopedTimer(indexCounterResetTimer);
-				static const GLuint zero = 0;
-				glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
-			}
-
 		}
 	}
 
@@ -254,7 +264,6 @@ void PointCloudScene::drawScene()
 		glClear(GL_COLOR_BUFFER_BIT);
 		glDisable(GL_DEPTH_TEST);
 		m_outputShader.use();
-		// glUniform1i(m_outputShader.getUniformLocation("progressive"), m_doProgressive);
 		// The vertex shader will create a screen space quad, so no need to bind a different VAO & VBO
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
@@ -285,12 +294,17 @@ void PointCloudScene::drawGUI()
 	const float frameTime = GLUtils::getElapsed(newFrameTimer);
 	ImGui::Text("Frame time: %.1f ms (%.1f fps)", frameTime, 1000.0f / frameTime);
 	ImGui::Text("\tID Pass time: %.1f ms", GLUtils::getElapsed(idPassTimer));
+	if (m_doProgressive)
+	{
+		ImGui::Text("\t\tIndex Compute time: %.1f ms", GLUtils::getElapsed(indexComputeTimer));
+		ImGui::Text("\t\t\tIndex Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
+		ImGui::Text("\t\t\tIndex Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
+		ImGui::Text("\t\t\tVisibility Compute time: %.1f ms", GLUtils::getElapsed(indexComputeDispatchTimer));
+	}
 	ImGui::Text("\t\tPoints Draw time: %.1f ms", GLUtils::getElapsed(pointsDrawTimer));
 	if (m_doProgressive)
 	{
-		ImGui::Text("\t\t\tIndex Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
 		ImGui::Text("\t\t\tReproject Draw time: %.1f ms", GLUtils::getElapsed(reprojectDrawTimer));
-		ImGui::Text("\t\t\tIndex Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
 		ImGui::Text("\t\t\tRandom Fill Draw time: %.1f ms", GLUtils::getElapsed(randomFillDrawTimer));
 	}
 	ImGui::Text("\tOutput Pass time: %.1f ms", GLUtils::getElapsed(outputPassTimer));

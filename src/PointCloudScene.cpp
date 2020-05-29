@@ -14,6 +14,7 @@
 PointCloudScene::PointCloudScene() :
 	m_idFBO(), m_idTexture(), m_depthTexture(), m_colourTexture(),
 	m_visComputeShader({{GL_COMPUTE_SHADER, "shaders/visibility_comp.glsl"}}),
+	m_elementComputeShader({{GL_COMPUTE_SHADER, "shaders/element_comp.glsl"}}),
 	m_pointsShader(
 		{{GL_VERTEX_SHADER, "shaders/points_vert.glsl"}, {GL_FRAGMENT_SHADER, "shaders/points_frag.glsl"}}),
 	m_outputShader({{GL_VERTEX_SHADER, "shaders/screenspace_vert.glsl"},
@@ -22,7 +23,7 @@ PointCloudScene::PointCloudScene() :
 						   glm::rotate(glm::mat4(1.0), 3.14159f / 2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
 						   glm::vec3(0.0f, 0.0f, -5.0f))),
 	m_pointsBuffer(), m_colBuffer(), m_visBuffer(), m_elementBuffer(), m_shuffledBuffer(),
-	m_indirectElementsBuffer(), m_indirectComputeBuffer(), m_camera(), m_computeDispatchCountX(800), m_computeDispatchCountY(600), m_numPointsVisible(0),
+	m_indirectElementsBuffer(), m_indirectComputeBuffer(), m_camera(), m_computeDispatchCount(0), m_numPointsVisible(0),
 	m_numPointsTotal(0), m_doProgressive(true), m_doShuffle(true), m_fillStartIndex(0), m_fillRate(1000)
 {
 	// enable programmable point size in vertex shaders, no better place to put this?
@@ -37,26 +38,33 @@ PointCloudScene::PointCloudScene() :
 		glm::value_ptr(m_camera.getProjection()));
 	glUniformMatrix4fv(m_pointsShader.getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(m_modelMat));
 
-	// TODO: map out texture units properly
-	m_visComputeShader.use();
+	// compute shader bindings
 	m_elementBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
 	m_elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
 	m_indirectElementsBuffer.bindAsIndexed(GL_ATOMIC_COUNTER_BUFFER, 0);
 
-	m_outputShader.use();
+	// TODO: map out texture units properly
 	// use texture unit 0 for the depth texture
 	glActiveTexture(GL_TEXTURE0);
 	m_idTexture.bindAs(GL_TEXTURE_2D);
-	glUniform1i(m_outputShader.getUniformLocation("idTexture"), 0);
-	glUniform1i(m_visComputeShader.getUniformLocation("idTexture"), 0);
 	// use texture unit 1 for the depth texture
 	glActiveTexture(GL_TEXTURE1);
 	m_depthTexture.bindAs(GL_TEXTURE_2D);
-	glUniform1i(m_outputShader.getUniformLocation("depthTexture"), 1);
-	glUniform1i(m_visComputeShader.getUniformLocation("depthTexture"), 1);
 	// use texture unit 2 for the colour texture
 	glActiveTexture(GL_TEXTURE2);
 	m_colourTexture.bindAs(GL_TEXTURE_BUFFER);
+
+	m_visComputeShader.use();
+	glUniform1i(m_visComputeShader.getUniformLocation("idTexture"), 0);
+	glUniform1i(m_visComputeShader.getUniformLocation("depthTexture"), 1);
+
+	m_elementComputeShader.use();
+	glUniform1i(m_elementComputeShader.getUniformLocation("idTexture"), 0);
+	glUniform1i(m_elementComputeShader.getUniformLocation("depthTexture"), 1);
+
+	m_outputShader.use();
+	glUniform1i(m_outputShader.getUniformLocation("idTexture"), 0);
+	glUniform1i(m_outputShader.getUniformLocation("depthTexture"), 1);
 	glUniform1i(m_outputShader.getUniformLocation("colTexture"), 2);
 
 	// set up indirect drawing parameters buffer, the first element (count) will also be mapped to an atomic
@@ -68,9 +76,9 @@ PointCloudScene::PointCloudScene() :
 	// m_indirectElementsBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 2);
 
 	// set up indirect compute parameters buffer
-	const DispatchIndirectCommand indirectCompute = {m_computeDispatchCountX, m_computeDispatchCountY, 1};
-	m_indirectComputeBuffer.bindAs(GL_DISPATCH_INDIRECT_BUFFER);
-	glBufferData(GL_DISPATCH_INDIRECT_BUFFER, sizeof(indirectCompute), &indirectCompute, GL_DYNAMIC_DRAW);
+	// const DispatchIndirectCommand indirectCompute = {m_computeDispatchCountX, m_computeDispatchCountY, 1};
+	// m_indirectComputeBuffer.bindAs(GL_DISPATCH_INDIRECT_BUFFER);
+	// glBufferData(GL_DISPATCH_INDIRECT_BUFFER, sizeof(indirectCompute), &indirectCompute, GL_DYNAMIC_DRAW);
 }
 
 bool PointCloudScene::loadPointCloud(const char* filepath)
@@ -85,12 +93,15 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	// we want 'm_numPointsTotal' bits to be allocated for the visibility buffer, but this has to be
 	// allocated in bytes
 	const size_t numVertsBytes = ceil(m_numPointsTotal / 8.0f); // 8 bits per byte
-	std::cout << "num bytes: " << numVertsBytes << "\n";
+	std::cout << "visibility buffer num bytes: " << numVertsBytes << "\n";
+	std::cout << "visibility buffer num uints: " << ceil(numVertsBytes / 4.0f) << "\n";
 	// determine workgroup count, we want 1 shader invocation per uint in the visibililty buffer
 	int work_grp_cnt, work_grp_size;
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_cnt);
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size);
-	// m_computeDispatchCount = ceil(numVertsBytes / 4);
+
+	// TODO: this is fucked, send a uniform to determine how many uints to process each invocation
+	m_computeDispatchCount = ceil(numVertsBytes / 4) > work_grp_cnt ? work_grp_cnt : ceil(numVertsBytes / 4);
 
 	std::cout<<"work_grp_cnt: "<<work_grp_cnt<<"\n";
 	std::cout<<"work_grp_size: "<<work_grp_size<<"\n";
@@ -175,8 +186,8 @@ void PointCloudScene::setFramebufferParams(const unsigned int& width, const unsi
 	m_indirectComputeBuffer.bindAs(GL_DISPATCH_INDIRECT_BUFFER);
 	glBufferData(GL_DISPATCH_INDIRECT_BUFFER, sizeof(indirectCompute), &indirectCompute, GL_DYNAMIC_DRAW);
 
-	m_computeDispatchCountX = width;
-	m_computeDispatchCountY = height;
+	// m_computeDispatchCountX = width;
+	// m_computeDispatchCountY = height;
 
 	GLUtils::Framebuffer::bindDefault();
 	glViewport(0, 0, width, height);
@@ -193,6 +204,16 @@ void PointCloudScene::drawScene()
 		if (m_doProgressive)
 		{
 			GLUtils::scopedTimer(indexComputeTimer);
+			// first pass goes over the last frames ID texture and flip a bit for each element in the visbility buffer
+			{
+				GLUtils::scopedTimer(visibilityComputeDispatchTimer);
+				m_visComputeShader.use();
+				// TODO: could dispatch 1/4 count here? only read 1 pixel from a 2x2 reigon, rotating sequentially
+				// glDispatchCompute(m_computeDispatchCountX, m_computeDispatchCountY, 1);
+				glDispatchComputeIndirect(0); // uses the 0th set of parameters in the bound GL_DISPATCH_INDIRECT_BUFFER
+			}
+			// read the last frame's visible count a frame later just to update the ui, but careful as this can cause a
+			// stall depending on where it's placed
 			{
 				GLUtils::scopedTimer(indexCounterReadTimer);
 				glGetBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &m_numPointsVisible);
@@ -204,10 +225,9 @@ void PointCloudScene::drawScene()
 				glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(GLuint), &zero);
 			}
 			{
-				GLUtils::scopedTimer(indexComputeDispatchTimer);
-				m_visComputeShader.use();
-				// glDispatchCompute(m_computeDispatchCountX, m_computeDispatchCountY, 1);
-				glDispatchComputeIndirect(0);
+				GLUtils::scopedTimer(elementComputeDispatchTimer);
+				m_elementComputeShader.use();
+				glDispatchCompute(m_computeDispatchCount, 1, 1);
 			}
 		}
 
@@ -281,6 +301,7 @@ void PointCloudScene::drawGUI()
 	if (m_doProgressive)
 	{
 		ImGui::Checkbox("Shuffle Fill", &m_doShuffle);
+		// TODO: change this to 'fill budget', as a percentage
 		ImGui::Text("Fill Rate (per frame):");
 		ImGui::SliderInt("", &m_fillRate, 0, (m_numPointsTotal / 10)); // this seems like a reasonable limit
 	}
@@ -300,9 +321,10 @@ void PointCloudScene::drawGUI()
 	if (m_doProgressive)
 	{
 		ImGui::Text("\t\tIndex Compute time: %.1f ms", GLUtils::getElapsed(indexComputeTimer));
+		ImGui::Text("\t\t\tVisibility Compute time: %.1f ms", GLUtils::getElapsed(visibilityComputeDispatchTimer));
 		ImGui::Text("\t\t\tIndex Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
 		ImGui::Text("\t\t\tIndex Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
-		ImGui::Text("\t\t\tVisibility Compute time: %.1f ms", GLUtils::getElapsed(indexComputeDispatchTimer));
+		ImGui::Text("\t\t\tElement Buffer Compute time: %.1f ms", GLUtils::getElapsed(elementComputeDispatchTimer));
 	}
 	ImGui::Text("\t\tPoints Draw time: %.1f ms", GLUtils::getElapsed(pointsDrawTimer));
 	if (m_doProgressive)

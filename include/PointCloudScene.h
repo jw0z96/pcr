@@ -49,7 +49,7 @@ private:
 
 	const GLUtils::Texture m_idTexture, m_depthTexture, m_colourTexture;
 
-	const GLUtils::ShaderProgram m_visComputeShader, m_pointsShader, m_outputShader;
+	const GLUtils::ShaderProgram m_visComputeShader, m_elementComputeShader, m_pointsShader, m_outputShader;
 
 	const GLUtils::VAO m_pointCloudVAO;
 
@@ -60,7 +60,7 @@ private:
 
 	OrbitalCamera m_camera;
 
-	GLuint m_computeDispatchCountX, m_computeDispatchCountY;
+	GLuint m_computeDispatchCount;
 	GLuint m_numPointsVisible;
 	GLuint m_numPointsTotal;
 

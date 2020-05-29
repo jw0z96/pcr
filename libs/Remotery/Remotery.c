@@ -1,1 +1,0 @@
-/home/jw0z/dev/Remotery/lib/Remotery.c

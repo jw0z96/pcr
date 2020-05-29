@@ -5,5 +5,3 @@ Basic implementation of ['Progressive Real-Time Rendering of Unprocessed Point C
 Uses:
 - [tinyply](https://github.com/ddiakopoulos/tinyply)
 - [dear imgui](https://github.com/ocornut/imgui)
-- [optional](https://github.com/TartanLlama/optional)
-- [Remotery](https://github.com/Celtoys/Remotery)

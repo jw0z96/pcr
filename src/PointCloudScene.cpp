@@ -114,17 +114,26 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	const size_t numVertsBytes = ceil(m_numPointsTotal / 8.0f); // 8 bits per byte
 	std::cout << "visibility buffer num bytes: " << numVertsBytes << "\n";
 	std::cout << "visibility buffer num uints: " << ceil(numVertsBytes / 4.0f) << "\n";
-	// determine workgroup count, we want 1 shader invocation per uint in the visibililty buffer
+
+	// get the limits for the compute shader invocation
 	int work_grp_cnt, work_grp_size;
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_cnt);
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size);
-
-	// TODO: this is fucked, send a uniform to determine how many uints to process each invocation
-	m_computeDispatchCount =
-		ceil(numVertsBytes / 4) > work_grp_cnt ? work_grp_cnt : ceil(numVertsBytes / 4);
-
 	std::cout << "work_grp_cnt: " << work_grp_cnt << "\n";
 	std::cout << "work_grp_size: " << work_grp_size << "\n";
+
+	// set the compute dispatch parameters
+	m_elementComputeShader.use();
+	// determine the number of elements in the visibility buffer, or number of uints in the buffer at 4 bytes each
+	unsigned int elementCount = ceil(numVertsBytes / 4.0f);
+	glUniform1ui(m_elementComputeShader.getUniformLocation("numElements"), elementCount);
+	// determine the number of elements to process in each shader invocation
+	unsigned int groupCount = floor(elementCount / work_grp_cnt) + 1;
+	glUniform1ui(m_elementComputeShader.getUniformLocation("groupCount"), groupCount);
+	std::cout<<"groupCount: "<<groupCount<<"\n";
+	// determine the number of compute shaders to dispatch, this should always be less than work_grp_cnt
+	m_computeDispatchCount = ceil(elementCount / groupCount);
+	std::cout<<"m_computeDispatchCount: "<<m_computeDispatchCount<<"\n";
 
 	// we have to bind a VAO to hold the vertex attributes for the buffers, and the element buffer bindings
 	m_pointCloudVAO.bind();

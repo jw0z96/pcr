@@ -67,5 +67,5 @@ private:
 
 	bool m_doProgressive, m_doShuffle;
 	unsigned int m_fillStartIndex;
-	int m_fillRate;
+	float m_fillRate;
 };

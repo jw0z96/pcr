@@ -40,7 +40,7 @@ PointCloudScene::PointCloudScene()
 	, m_doProgressive(true)
 	, m_doShuffle(true)
 	, m_fillStartIndex(0)
-	, m_fillRate(1000)
+	, m_fillRate(10.0f)
 {
 	// enable programmable point size in vertex shaders, no better place to put this?
 	glEnable(GL_PROGRAM_POINT_SIZE);
@@ -289,22 +289,22 @@ void PointCloudScene::drawScene()
 				}
 				{
 					GLUtils::scopedTimer(randomFillDrawTimer);
-
+					const unsigned int fillBudget = m_fillRate * 0.01f * m_numPointsTotal;
 					if(m_doShuffle)
 					{
 						m_shuffledBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 						// make sure this doesn't overflow...
 						glDrawElementsBaseVertex(
-							GL_POINTS, m_fillRate, GL_UNSIGNED_INT, nullptr, m_fillStartIndex);
+							GL_POINTS, fillBudget, GL_UNSIGNED_INT, nullptr, m_fillStartIndex);
 					}
 					else
 					{
-						glDrawArrays(GL_POINTS, m_fillStartIndex, m_fillRate);
+						glDrawArrays(GL_POINTS, m_fillStartIndex, fillBudget);
 					}
 
-					m_fillStartIndex = ((m_fillStartIndex + m_fillRate) > m_numPointsTotal)
+					m_fillStartIndex = ((m_fillStartIndex + fillBudget) > m_numPointsTotal)
 						? 0
-						: m_fillStartIndex + m_fillRate;
+						: m_fillStartIndex + fillBudget;
 				}
 			}
 			else
@@ -336,15 +336,14 @@ void PointCloudScene::drawGUI()
 	{
 		ImGui::Checkbox("Shuffle Fill", &m_doShuffle);
 		// TODO: change this to 'fill budget', as a percentage
-		ImGui::Text("Fill Rate (per frame):");
-		ImGui::SliderInt(
-			"", &m_fillRate, 0, (m_numPointsTotal / 10)); // this seems like a reasonable limit
+		ImGui::Text("Fill Budget (per frame):");
+		ImGui::SliderFloat("%", &m_fillRate, 0.0f, 100.0f, "%.1f");
 	}
 
 	ImGui::Separator();
 
 	ImGui::Text("Drawing %u / %u points (%.2f%%)",
-		m_doProgressive ? (m_numPointsVisible + m_fillRate) : m_numPointsTotal,
+		m_doProgressive ? m_numPointsVisible : m_numPointsTotal, // doesn't account for fill rate
 		m_numPointsTotal,
 		m_doProgressive ? (m_numPointsVisible * 100.0f / m_numPointsTotal) : 100.0f);
 

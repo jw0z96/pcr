@@ -17,10 +17,16 @@ public:
 	void processInput(const SDL_Event& event);
 
 	// View Matrix methods
-	inline void setCenter(const glm::vec3& target) { m_target = target; }
+	inline void setCenter(const glm::vec3& target)
+	{
+		m_target = target;
+	}
 
 	// distance from target, a 'dolly' of sorts
-	inline void setDistance(float distance) { m_distance = distance; }
+	inline void setDistance(float distance)
+	{
+		m_distance = distance;
+	}
 
 	glm::mat4 getView() const
 	{
@@ -58,8 +64,8 @@ public:
 
 	inline glm::mat4 getProjection() const
 	{
-		return m_projectionMat.has_value() ? m_projectionMat.value() :
-											 m_projectionMat.emplace(calculateProjection());
+		return m_projectionMat.has_value() ? m_projectionMat.value()
+										   : m_projectionMat.emplace(calculateProjection());
 	}
 
 private:

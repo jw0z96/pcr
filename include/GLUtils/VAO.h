@@ -8,28 +8,41 @@
 
 namespace GLUtils
 {
-	class VAO
+class VAO
+{
+public:
+	VAO()
+		: m_id(0)
 	{
-	public:
-		VAO() : m_id(0) { glGenVertexArrays(1, &m_id); }
+		glGenVertexArrays(1, &m_id);
+	}
 
-		~VAO() { glDeleteVertexArrays(1, &m_id); }
+	~VAO()
+	{
+		glDeleteVertexArrays(1, &m_id);
+	}
 
-		// Disable copy constructor and assignment operator, since we're managing OpenGL resources, and it's
-		// not worth the hassle to share their ownership
-		VAO(const VAO &) = delete;
-		VAO &operator=(const VAO &) = delete;
-		// ...and move constructor, move assignment
-		VAO(VAO&&) = delete;
-		VAO& operator=(VAO&&) = delete;
+	// Disable copy constructor and assignment operator, since we're managing OpenGL resources, and it's
+	// not worth the hassle to share their ownership
+	VAO(const VAO&) = delete;
+	VAO& operator=(const VAO&) = delete;
+	// ...and move constructor, move assignment
+	VAO(VAO&&) = delete;
+	VAO& operator=(VAO&&) = delete;
 
-		inline void bind() const { glBindVertexArray(m_id); }
+	inline void bind() const
+	{
+		glBindVertexArray(m_id);
+	}
 
-		static inline void unbind() { glBindVertexArray(0); }
+	static inline void unbind()
+	{
+		glBindVertexArray(0);
+	}
 
-	private:
-		// VAO ID
-		GLuint m_id;
-	};
+private:
+	// VAO ID
+	GLuint m_id;
+};
 
 } // namespace GLUtils

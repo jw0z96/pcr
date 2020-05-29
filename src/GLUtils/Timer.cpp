@@ -5,11 +5,11 @@
 
 namespace
 {
-	// Since the intended usage is via the 'named' macros, which hash the strings at compile time,
-	// we don't need to hash here... why are we using a map again?
-	auto noHash = [](const size_t& i) { return i; };
-	typedef std::unordered_map<size_t, GLUtils::Timer, decltype(noHash)> TimerMap;
-	static TimerMap s_timers(10, noHash); // bucket size of 10?
+// Since the intended usage is via the 'named' macros, which hash the strings at compile time,
+// we don't need to hash here... why are we using a map again?
+auto noHash = [](const size_t& i) { return i; };
+typedef std::unordered_map<size_t, GLUtils::Timer, decltype(noHash)> TimerMap;
+static TimerMap s_timers(10, noHash); // bucket size of 10?
 } // namespace
 
 void GLUtils::_startTimer(const size_t& id)
@@ -22,7 +22,7 @@ void GLUtils::_startTimer(const size_t& id)
 void GLUtils::_endTimer(const size_t& id)
 {
 	TimerMap::iterator it = s_timers.find(id);
-	if (it != s_timers.end())
+	if(it != s_timers.end())
 	{
 		it->second.end();
 	}
@@ -52,10 +52,14 @@ float GLUtils::_getElapsed(const size_t& id)
 	return it != s_timers.end() ? it->second.elapsed() : 0.0f;
 }
 
-void GLUtils::clearTimers() { s_timers.clear(); }
+void GLUtils::clearTimers()
+{
+	s_timers.clear();
+}
 
-GLUtils::Timer::Timer() :
-	m_queries(), // default initialize elements
+GLUtils::Timer::Timer()
+	: m_queries()
+	, // default initialize elements
 	m_elapsed(0.0f)
 {
 	glGenQueries(s_bufferSize * 2, &m_queries.data()->start);

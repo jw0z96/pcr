@@ -1,11 +1,11 @@
 #pragma once
 
 #include "GLUtils/Buffer.h"
-#include "GLUtils/Texture.h"
-#include "GLUtils/VAO.h"
 #include "GLUtils/Framebuffer.h"
 #include "GLUtils/ShaderProgram.h"
+#include "GLUtils/Texture.h"
 #include "GLUtils/Timer.h"
+#include "GLUtils/VAO.h"
 
 #include "OrbitalCamera.h"
 
@@ -49,14 +49,15 @@ private:
 
 	const GLUtils::Texture m_idTexture, m_depthTexture, m_colourTexture;
 
-	const GLUtils::ShaderProgram m_visComputeShader, m_elementComputeShader, m_pointsShader, m_outputShader;
+	const GLUtils::ShaderProgram m_visComputeShader, m_elementComputeShader, m_pointsShader,
+		m_outputShader;
 
 	const GLUtils::VAO m_pointCloudVAO;
 
 	const glm::mat4 m_modelMat; // Model matrix to roughly center and orient the point cloud...
 
-	const GLUtils::Buffer m_pointsBuffer, m_colBuffer, m_visBuffer, m_elementBuffer, m_shuffledBuffer,
-		m_indirectElementsBuffer, m_indirectComputeBuffer;
+	const GLUtils::Buffer m_pointsBuffer, m_colBuffer, m_visBuffer, m_elementBuffer,
+		m_shuffledBuffer, m_indirectElementsBuffer, m_indirectComputeBuffer;
 
 	OrbitalCamera m_camera;
 

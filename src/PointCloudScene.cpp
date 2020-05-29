@@ -11,20 +11,36 @@
 #include <algorithm>
 #include <random>
 
-PointCloudScene::PointCloudScene() :
-	m_idFBO(), m_idTexture(), m_depthTexture(), m_colourTexture(),
-	m_visComputeShader({{GL_COMPUTE_SHADER, "shaders/visibility_comp.glsl"}}),
-	m_elementComputeShader({{GL_COMPUTE_SHADER, "shaders/element_comp.glsl"}}),
-	m_pointsShader(
-		{{GL_VERTEX_SHADER, "shaders/points_vert.glsl"}, {GL_FRAGMENT_SHADER, "shaders/points_frag.glsl"}}),
-	m_outputShader({{GL_VERTEX_SHADER, "shaders/screenspace_vert.glsl"},
-					{GL_FRAGMENT_SHADER, "shaders/output_frag.glsl"}}),
-	m_pointCloudVAO(), m_modelMat(glm::translate(
-						   glm::rotate(glm::mat4(1.0), 3.14159f / 2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
-						   glm::vec3(0.0f, 0.0f, -5.0f))),
-	m_pointsBuffer(), m_colBuffer(), m_visBuffer(), m_elementBuffer(), m_shuffledBuffer(),
-	m_indirectElementsBuffer(), m_indirectComputeBuffer(), m_camera(), m_computeDispatchCount(0), m_numPointsVisible(0),
-	m_numPointsTotal(0), m_doProgressive(true), m_doShuffle(true), m_fillStartIndex(0), m_fillRate(1000)
+PointCloudScene::PointCloudScene()
+	: m_idFBO()
+	, m_idTexture()
+	, m_depthTexture()
+	, m_colourTexture()
+	, m_visComputeShader({{GL_COMPUTE_SHADER, "shaders/visibility_comp.glsl"}})
+	, m_elementComputeShader({{GL_COMPUTE_SHADER, "shaders/element_comp.glsl"}})
+	, m_pointsShader({{GL_VERTEX_SHADER, "shaders/points_vert.glsl"},
+		  {GL_FRAGMENT_SHADER, "shaders/points_frag.glsl"}})
+	, m_outputShader({{GL_VERTEX_SHADER, "shaders/screenspace_vert.glsl"},
+		  {GL_FRAGMENT_SHADER, "shaders/output_frag.glsl"}})
+	, m_pointCloudVAO()
+	, m_modelMat(
+		  glm::translate(glm::rotate(glm::mat4(1.0), 3.14159f / 2.0f, glm::vec3(-1.0f, 0.0f, 0.0f)),
+			  glm::vec3(0.0f, 0.0f, -5.0f)))
+	, m_pointsBuffer()
+	, m_colBuffer()
+	, m_visBuffer()
+	, m_elementBuffer()
+	, m_shuffledBuffer()
+	, m_indirectElementsBuffer()
+	, m_indirectComputeBuffer()
+	, m_camera()
+	, m_computeDispatchCount(0)
+	, m_numPointsVisible(0)
+	, m_numPointsTotal(0)
+	, m_doProgressive(true)
+	, m_doShuffle(true)
+	, m_fillStartIndex(0)
+	, m_fillRate(1000)
 {
 	// enable programmable point size in vertex shaders, no better place to put this?
 	glEnable(GL_PROGRAM_POINT_SIZE);
@@ -33,10 +49,12 @@ PointCloudScene::PointCloudScene() :
 
 	// Set constant uniforms on the shaders
 	m_pointsShader.use();
-	glUniformMatrix4fv(
-		m_pointsShader.getUniformLocation("projection"), 1, GL_FALSE,
+	glUniformMatrix4fv(m_pointsShader.getUniformLocation("projection"),
+		1,
+		GL_FALSE,
 		glm::value_ptr(m_camera.getProjection()));
-	glUniformMatrix4fv(m_pointsShader.getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(m_modelMat));
+	glUniformMatrix4fv(
+		m_pointsShader.getUniformLocation("model"), 1, GL_FALSE, glm::value_ptr(m_modelMat));
 
 	// compute shader bindings
 	m_elementBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
@@ -71,7 +89,8 @@ PointCloudScene::PointCloudScene() :
 	// counter in the compute shader
 	const DrawElementsIndirectCommand indirectElements = {0, 1, 0, 0, 0};
 	m_indirectElementsBuffer.bindAs(GL_DRAW_INDIRECT_BUFFER);
-	glBufferData(GL_DRAW_INDIRECT_BUFFER, sizeof(indirectElements), &indirectElements, GL_DYNAMIC_DRAW);
+	glBufferData(
+		GL_DRAW_INDIRECT_BUFFER, sizeof(indirectElements), &indirectElements, GL_DYNAMIC_DRAW);
 	m_indirectElementsBuffer.bindAsIndexed(GL_ATOMIC_COUNTER_BUFFER, 0);
 	// m_indirectElementsBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 2);
 
@@ -101,26 +120,31 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size);
 
 	// TODO: this is fucked, send a uniform to determine how many uints to process each invocation
-	m_computeDispatchCount = ceil(numVertsBytes / 4) > work_grp_cnt ? work_grp_cnt : ceil(numVertsBytes / 4);
+	m_computeDispatchCount =
+		ceil(numVertsBytes / 4) > work_grp_cnt ? work_grp_cnt : ceil(numVertsBytes / 4);
 
-	std::cout<<"work_grp_cnt: "<<work_grp_cnt<<"\n";
-	std::cout<<"work_grp_size: "<<work_grp_size<<"\n";
+	std::cout << "work_grp_cnt: " << work_grp_cnt << "\n";
+	std::cout << "work_grp_size: " << work_grp_size << "\n";
 
 	// we have to bind a VAO to hold the vertex attributes for the buffers, and the element buffer bindings
 	m_pointCloudVAO.bind();
 
 	// generate buffers for verts, set the VAO attributes
 	m_pointsBuffer.bindAs(GL_ARRAY_BUFFER);
-	glBufferData(
-		GL_ARRAY_BUFFER, plyPositions->buffer.size_bytes(), plyPositions->buffer.get(), GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER,
+		plyPositions->buffer.size_bytes(),
+		plyPositions->buffer.get(),
+		GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
 
 	// generate buffers for colours
 	m_colBuffer.bindAs(GL_TEXTURE_BUFFER);
-	glBufferData(
-		GL_TEXTURE_BUFFER, plyColours->buffer.size_bytes(), plyColours->buffer.get(), GL_STATIC_DRAW);
+	glBufferData(GL_TEXTURE_BUFFER,
+		plyColours->buffer.size_bytes(),
+		plyColours->buffer.get(),
+		GL_STATIC_DRAW);
 	// map it to a texture
 	glActiveTexture(GL_TEXTURE2);
 	m_colourTexture.bindAs(GL_TEXTURE_BUFFER);
@@ -139,7 +163,8 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	// Generate an element buffer for the point indices to redraw
 	m_elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 	// give it enough elements for a full draw
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_numPointsTotal * sizeof(GLuint), nullptr, GL_DYNAMIC_COPY);
+	glBufferData(
+		GL_ELEMENT_ARRAY_BUFFER, m_numPointsTotal * sizeof(GLuint), nullptr, GL_DYNAMIC_COPY);
 	// Also bind it as a SSBO so we can use it in the compute shader
 	m_elementBuffer.bindAs(GL_SHADER_STORAGE_BUFFER);
 	m_elementBuffer.bindAsIndexed(GL_SHADER_STORAGE_BUFFER, 1);
@@ -151,8 +176,10 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	std::mt19937 g(rd());
 	std::shuffle(shuffledIndices.begin(), shuffledIndices.end(), g);
 	m_shuffledBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
-	glBufferData(
-		GL_ELEMENT_ARRAY_BUFFER, m_numPointsTotal * sizeof(GLuint), shuffledIndices.data(), GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+		m_numPointsTotal * sizeof(GLuint),
+		shuffledIndices.data(),
+		GL_STATIC_DRAW);
 
 	std::cout << "gl error: " << glGetError() << "\n"; // TODO: A proper macro for glErrors
 
@@ -161,14 +188,16 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 
 void PointCloudScene::processEvent(const SDL_Event& event)
 {
-	if (event.type == SDL_WINDOWEVENT &&
-		(event.window.event == SDL_WINDOWEVENT_RESIZED || event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED))
+	if(event.type == SDL_WINDOWEVENT &&
+		(event.window.event == SDL_WINDOWEVENT_RESIZED ||
+			event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED))
 	{
 		setFramebufferParams(event.window.data1, event.window.data2); // implicit cast to uint
 		m_camera.setAspect(event.window.data1, event.window.data2);
 		m_pointsShader.use();
-		glUniformMatrix4fv(
-			m_pointsShader.getUniformLocation("projection"), 1, GL_FALSE,
+		glUniformMatrix4fv(m_pointsShader.getUniformLocation("projection"),
+			1,
+			GL_FALSE,
 			glm::value_ptr(m_camera.getProjection()));
 	}
 	m_camera.processInput(event);
@@ -176,7 +205,7 @@ void PointCloudScene::processEvent(const SDL_Event& event)
 
 void PointCloudScene::setFramebufferParams(const unsigned int& width, const unsigned int& height)
 {
-	if (!initIndexFramebuffer(width, height))
+	if(!initIndexFramebuffer(width, height))
 	{
 		std::cout << "error resizing index framebuffer\n";
 	}
@@ -184,7 +213,8 @@ void PointCloudScene::setFramebufferParams(const unsigned int& width, const unsi
 	// set up indirect compute parameters buffer
 	const DispatchIndirectCommand indirectCompute = {width, height, 1};
 	m_indirectComputeBuffer.bindAs(GL_DISPATCH_INDIRECT_BUFFER);
-	glBufferData(GL_DISPATCH_INDIRECT_BUFFER, sizeof(indirectCompute), &indirectCompute, GL_DYNAMIC_DRAW);
+	glBufferData(
+		GL_DISPATCH_INDIRECT_BUFFER, sizeof(indirectCompute), &indirectCompute, GL_DYNAMIC_DRAW);
 
 	// m_computeDispatchCountX = width;
 	// m_computeDispatchCountY = height;
@@ -201,7 +231,7 @@ void PointCloudScene::drawScene()
 	{
 		GLUtils::scopedTimer(idPassTimer);
 
-		if (m_doProgressive)
+		if(m_doProgressive)
 		{
 			GLUtils::scopedTimer(indexComputeTimer);
 			// first pass goes over the last frames ID texture and flip a bit for each element in the visbility buffer
@@ -210,7 +240,8 @@ void PointCloudScene::drawScene()
 				m_visComputeShader.use();
 				// TODO: could dispatch 1/4 count here? only read 1 pixel from a 2x2 reigon, rotating sequentially
 				// glDispatchCompute(m_computeDispatchCountX, m_computeDispatchCountY, 1);
-				glDispatchComputeIndirect(0); // uses the 0th set of parameters in the bound GL_DISPATCH_INDIRECT_BUFFER
+				glDispatchComputeIndirect(
+					0); // uses the 0th set of parameters in the bound GL_DISPATCH_INDIRECT_BUFFER
 			}
 			// read the last frame's visible count a frame later just to update the ui, but careful as this can cause a
 			// stall depending on where it's placed
@@ -240,15 +271,18 @@ void PointCloudScene::drawScene()
 			glEnable(GL_DEPTH_TEST);
 			// update point shader view uniform with new view matrix
 			m_pointsShader.use();
-			glUniformMatrix4fv(
-				m_pointsShader.getUniformLocation("view"), 1, GL_FALSE, glm::value_ptr(m_camera.getView()));
+			glUniformMatrix4fv(m_pointsShader.getUniformLocation("view"),
+				1,
+				GL_FALSE,
+				glm::value_ptr(m_camera.getView()));
 
 			// dispatch point draw
-			if (m_doProgressive)
+			if(m_doProgressive)
 			{
 				{
 					GLUtils::scopedTimer(reprojectDrawTimer);
-					glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_ELEMENT_ARRAY_BARRIER_BIT | GL_ATOMIC_COUNTER_BARRIER_BIT);
+					glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_ELEMENT_ARRAY_BARRIER_BIT |
+						GL_ATOMIC_COUNTER_BARRIER_BIT);
 					m_pointsShader.use();
 					m_elementBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 					glDrawElementsIndirect(GL_POINTS, GL_UNSIGNED_INT, nullptr);
@@ -256,7 +290,7 @@ void PointCloudScene::drawScene()
 				{
 					GLUtils::scopedTimer(randomFillDrawTimer);
 
-					if (m_doShuffle)
+					if(m_doShuffle)
 					{
 						m_shuffledBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 						// make sure this doesn't overflow...
@@ -268,9 +302,9 @@ void PointCloudScene::drawScene()
 						glDrawArrays(GL_POINTS, m_fillStartIndex, m_fillRate);
 					}
 
-					m_fillStartIndex = ((m_fillStartIndex + m_fillRate) > m_numPointsTotal) ?
-						0 :
-						m_fillStartIndex + m_fillRate;
+					m_fillStartIndex = ((m_fillStartIndex + m_fillRate) > m_numPointsTotal)
+						? 0
+						: m_fillStartIndex + m_fillRate;
 				}
 			}
 			else
@@ -298,19 +332,20 @@ void PointCloudScene::drawGUI()
 	ImGui::Begin("Controls");
 	ImGui::Checkbox("Progressive Render", &m_doProgressive);
 
-	if (m_doProgressive)
+	if(m_doProgressive)
 	{
 		ImGui::Checkbox("Shuffle Fill", &m_doShuffle);
 		// TODO: change this to 'fill budget', as a percentage
 		ImGui::Text("Fill Rate (per frame):");
-		ImGui::SliderInt("", &m_fillRate, 0, (m_numPointsTotal / 10)); // this seems like a reasonable limit
+		ImGui::SliderInt(
+			"", &m_fillRate, 0, (m_numPointsTotal / 10)); // this seems like a reasonable limit
 	}
 
 	ImGui::Separator();
 
-	ImGui::Text(
-		"Drawing %u / %u points (%.2f%%)",
-		m_doProgressive ? (m_numPointsVisible + m_fillRate) : m_numPointsTotal, m_numPointsTotal,
+	ImGui::Text("Drawing %u / %u points (%.2f%%)",
+		m_doProgressive ? (m_numPointsVisible + m_fillRate) : m_numPointsTotal,
+		m_numPointsTotal,
 		m_doProgressive ? (m_numPointsVisible * 100.0f / m_numPointsTotal) : 100.0f);
 
 	ImGui::Separator();
@@ -318,19 +353,24 @@ void PointCloudScene::drawGUI()
 	const float frameTime = GLUtils::getElapsed(newFrameTimer);
 	ImGui::Text("Frame time: %.1f ms (%.1f fps)", frameTime, 1000.0f / frameTime);
 	ImGui::Text("\tID Pass time: %.1f ms", GLUtils::getElapsed(idPassTimer));
-	if (m_doProgressive)
+	if(m_doProgressive)
 	{
 		ImGui::Text("\t\tIndex Compute time: %.1f ms", GLUtils::getElapsed(indexComputeTimer));
-		ImGui::Text("\t\t\tVisibility Compute time: %.1f ms", GLUtils::getElapsed(visibilityComputeDispatchTimer));
-		ImGui::Text("\t\t\tIndex Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
-		ImGui::Text("\t\t\tIndex Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
-		ImGui::Text("\t\t\tElement Buffer Compute time: %.1f ms", GLUtils::getElapsed(elementComputeDispatchTimer));
+		ImGui::Text("\t\t\tVisibility Compute time: %.1f ms",
+			GLUtils::getElapsed(visibilityComputeDispatchTimer));
+		ImGui::Text(
+			"\t\t\tIndex Counter Read time: %.1f ms", GLUtils::getElapsed(indexCounterReadTimer));
+		ImGui::Text(
+			"\t\t\tIndex Counter Reset time: %.1f ms", GLUtils::getElapsed(indexCounterResetTimer));
+		ImGui::Text("\t\t\tElement Buffer Compute time: %.1f ms",
+			GLUtils::getElapsed(elementComputeDispatchTimer));
 	}
 	ImGui::Text("\t\tPoints Draw time: %.1f ms", GLUtils::getElapsed(pointsDrawTimer));
-	if (m_doProgressive)
+	if(m_doProgressive)
 	{
 		ImGui::Text("\t\t\tReproject Draw time: %.1f ms", GLUtils::getElapsed(reprojectDrawTimer));
-		ImGui::Text("\t\t\tRandom Fill Draw time: %.1f ms", GLUtils::getElapsed(randomFillDrawTimer));
+		ImGui::Text(
+			"\t\t\tRandom Fill Draw time: %.1f ms", GLUtils::getElapsed(randomFillDrawTimer));
 	}
 	ImGui::Text("\tOutput Pass time: %.1f ms", GLUtils::getElapsed(outputPassTimer));
 	ImGui::End();
@@ -355,8 +395,15 @@ bool PointCloudScene::initIndexFramebuffer(const unsigned int& width, const unsi
 	m_depthTexture.bindAs(GL_TEXTURE_2D);
 	// glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT,
 	// NULL);
-	glTexImage2D(
-		GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+	glTexImage2D(GL_TEXTURE_2D,
+		0,
+		GL_DEPTH_COMPONENT,
+		width,
+		height,
+		0,
+		GL_DEPTH_COMPONENT,
+		GL_FLOAT,
+		nullptr);
 	// glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT,
 	// GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -372,7 +419,7 @@ bool PointCloudScene::initIndexFramebuffer(const unsigned int& width, const unsi
 	glDrawBuffers(1, attachments.data());
 
 	bool success = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
-	if (!success)
+	if(!success)
 	{
 		std::cout << "Error: Framebuffer is not complete!\n";
 	}

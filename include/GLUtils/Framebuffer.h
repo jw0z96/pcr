@@ -8,29 +8,42 @@
 
 namespace GLUtils
 {
-	class Framebuffer
+class Framebuffer
+{
+public:
+	Framebuffer()
+		: m_id(0)
 	{
-	public:
-		Framebuffer() : m_id(0) { glGenFramebuffers(1, &m_id); }
+		glGenFramebuffers(1, &m_id);
+	}
 
-		~Framebuffer() { glDeleteFramebuffers(1, &m_id); }
+	~Framebuffer()
+	{
+		glDeleteFramebuffers(1, &m_id);
+	}
 
-		// Disable copy constructor and assignment operator, since we're managiang OpenGL resources, and it's
-		// not worth the hassle to share their ownership
-		Framebuffer(const Framebuffer &) = delete;
-		Framebuffer &operator=(const Framebuffer &) = delete;
-		// ...and move constructor, move assignment
-		Framebuffer(Framebuffer&&) = delete;
-		Framebuffer& operator=(Framebuffer&&) = delete;
+	// Disable copy constructor and assignment operator, since we're managiang OpenGL resources, and it's
+	// not worth the hassle to share their ownership
+	Framebuffer(const Framebuffer&) = delete;
+	Framebuffer& operator=(const Framebuffer&) = delete;
+	// ...and move constructor, move assignment
+	Framebuffer(Framebuffer&&) = delete;
+	Framebuffer& operator=(Framebuffer&&) = delete;
 
-		inline void bind() const { glBindFramebuffer(GL_FRAMEBUFFER, m_id); }
+	inline void bind() const
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, m_id);
+	}
 
-		// use this to 'unbind', since ID 0 represents the default framebuffer
-		static inline void bindDefault() { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
+	// use this to 'unbind', since ID 0 represents the default framebuffer
+	static inline void bindDefault()
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
 
-	private:
-		// Framebuffer ID
-		GLuint m_id;
-	};
+private:
+	// Framebuffer ID
+	GLuint m_id;
+};
 
 } // namespace GLUtils

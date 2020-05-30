@@ -62,6 +62,7 @@ private:
 	OrbitalCamera m_camera;
 
 	GLuint m_computeDispatchCount;
+	GLuint m_computeGroupCount;
 	GLuint m_numPointsVisible;
 	GLuint m_numPointsTotal;
 

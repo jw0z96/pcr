@@ -35,6 +35,7 @@ PointCloudScene::PointCloudScene()
 	, m_indirectComputeBuffer()
 	, m_camera()
 	, m_computeDispatchCount(0)
+	, m_computeGroupCount(0)
 	, m_numPointsVisible(0)
 	, m_numPointsTotal(0)
 	, m_doProgressive(true)
@@ -128,16 +129,14 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	unsigned int elementCount = ceil(numVertsBytes / 4.0f);
 	glUniform1ui(m_elementComputeShader.getUniformLocation("numElements"), elementCount);
 	// determine the number of elements to process in each shader invocation
-	unsigned int groupCount = floor(elementCount / work_grp_cnt) + 1;
-	glUniform1ui(m_elementComputeShader.getUniformLocation("groupCount"), groupCount);
-	std::cout<<"groupCount: "<<groupCount<<"\n";
+	m_computeGroupCount = floor(elementCount / work_grp_cnt) + 1;
+	std::cout<<"m_computeGroupCount: "<<m_computeGroupCount<<"\n";
 	// determine the number of compute shaders to dispatch, this should always be less than work_grp_cnt
-	m_computeDispatchCount = ceil(elementCount / groupCount);
+	m_computeDispatchCount = ceil(elementCount / m_computeGroupCount);
 	std::cout<<"m_computeDispatchCount: "<<m_computeDispatchCount<<"\n";
 
 	// we have to bind a VAO to hold the vertex attributes for the buffers, and the element buffer bindings
 	m_pointCloudVAO.bind();
-
 	// generate buffers for verts, set the VAO attributes
 	m_pointsBuffer.bindAs(GL_ARRAY_BUFFER);
 	glBufferData(GL_ARRAY_BUFFER,
@@ -248,9 +247,9 @@ void PointCloudScene::drawScene()
 				GLUtils::scopedTimer(visibilityComputeDispatchTimer);
 				m_visComputeShader.use();
 				// TODO: could dispatch 1/4 count here? only read 1 pixel from a 2x2 reigon, rotating sequentially
-				// glDispatchCompute(m_computeDispatchCountX, m_computeDispatchCountY, 1);
-				glDispatchComputeIndirect(
-					0); // uses the 0th set of parameters in the bound GL_DISPATCH_INDIRECT_BUFFER
+				// uses the 0th set of parameters in the bound GL_DISPATCH_INDIRECT_BUFFER, which is just the
+				// framebuffer dimensions
+				glDispatchComputeIndirect(0);
 			}
 			// read the last frame's visible count a frame later just to update the ui, but careful as this can cause a
 			// stall depending on where it's placed
@@ -267,7 +266,8 @@ void PointCloudScene::drawScene()
 			{
 				GLUtils::scopedTimer(elementComputeDispatchTimer);
 				m_elementComputeShader.use();
-				glDispatchCompute(m_computeDispatchCount, 1, 1);
+				// glDispatchCompute(m_computeDispatchCount, 1, 1);
+				glDispatchCompute(m_computeDispatchCount, m_computeGroupCount, 1);
 			}
 		}
 

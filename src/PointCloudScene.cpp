@@ -218,8 +218,16 @@ void PointCloudScene::setFramebufferParams(const unsigned int& width, const unsi
 		std::cout << "error resizing index framebuffer\n";
 	}
 
-	// set up indirect compute parameters buffer
-	const DispatchIndirectCommand indirectCompute = {width, height, 1};
+	// set up indirect compute parameters buffer, dispatch in tiles
+	// constexpr float tileSize = 1.0f;
+	// constexpr float tileSize = 8.0f;
+	constexpr float tileSize = 32.0f;
+	const DispatchIndirectCommand indirectCompute = {
+		GLuint(ceil(width / tileSize)),
+		GLuint(ceil(height / tileSize)),
+		1
+	};
+
 	m_indirectComputeBuffer.bindAs(GL_DISPATCH_INDIRECT_BUFFER);
 	glBufferData(
 		GL_DISPATCH_INDIRECT_BUFFER, sizeof(indirectCompute), &indirectCompute, GL_DYNAMIC_DRAW);

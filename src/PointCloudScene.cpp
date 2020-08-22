@@ -184,9 +184,17 @@ bool PointCloudScene::loadPointCloud(const char* filepath)
 	std::random_device rd;
 	std::mt19937 g(rd());
 	std::shuffle(shuffledIndices.begin(), shuffledIndices.end(), g);
+
+	// we double the size of it and repeat it so we can loop through the range with glDrawElements
+	// this introduces a lot of storage overhead, but it means we can get consistent framerates, as the shuffled draw
+	// can draw the full fillBudget at the end of the element buffer's range
+	const auto indicesCopy = shuffledIndices;
+	shuffledIndices.reserve(shuffledIndices.size() * 2);
+	shuffledIndices.insert(shuffledIndices.end(), indicesCopy.begin(), indicesCopy.end());
+
 	m_shuffledBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-		m_numPointsTotal * sizeof(GLuint),
+		shuffledIndices.size() * sizeof(GLuint),
 		shuffledIndices.data(),
 		GL_STATIC_DRAW);
 
@@ -315,8 +323,13 @@ void PointCloudScene::drawScene()
 					{
 						m_shuffledBuffer.bindAs(GL_ELEMENT_ARRAY_BUFFER);
 						// make sure this doesn't overflow...
-						glDrawElementsBaseVertex(
-							GL_POINTS, fillBudget, GL_UNSIGNED_INT, nullptr, m_fillStartIndex);
+						// this is ugly, the last one is a size offset into the index buffer
+						glDrawElements(
+							GL_POINTS,
+							fillBudget,
+							GL_UNSIGNED_INT,
+							(GLvoid*)(sizeof(GLuint) * m_fillStartIndex)
+						);
 					}
 					else
 					{

@@ -350,7 +350,13 @@ void PointCloudScene::drawScene()
 void PointCloudScene::drawGUI()
 {
 	// stats window
-	ImGui::Begin("Controls");
+	if (!ImGui::Begin("Controls"))
+	{
+		// Early out if the window is collapsed
+		ImGui::End();
+		return;
+	}
+
 	ImGui::Checkbox("Progressive Render", &m_doProgressive);
 
 	if(m_doProgressive)
@@ -375,6 +381,37 @@ void PointCloudScene::drawGUI()
 
 	const float frameTime = GLUtils::getElapsed(newFrameTimer);
 	ImGui::Text("Frame time: %.1f ms (%.1f fps)", frameTime, 1000.0f / frameTime);
+
+	// create a plot of the frame times
+	{
+		// 100 samples will be plotted in a line
+		constexpr unsigned int numFrameSamples = 50;
+		constexpr float numFrameSamplesReciprocal = 1.0f / (float)numFrameSamples;
+		static float frameTimes[numFrameSamples] = { 0.0f };
+		// this will be used as an index to update with the latest data, and to rotate the array in the display
+		static unsigned int frameOffset = 0;
+
+		frameTimes[frameOffset] = frameTime;
+
+		// average the frame samples
+		float average = 0.0f;
+		for (unsigned int n = 0; n < numFrameSamples; n++)
+		{
+			average += frameTimes[n];
+		}
+		average *= numFrameSamplesReciprocal;
+
+		// TODO: use fmt
+		char overlay[32];
+		sprintf(overlay, "Average %.1f ms (%.1f fps)", average, 1000.0f / average);
+
+		ImGui::PlotLines("##FrameTimes", frameTimes, numFrameSamples, frameOffset, overlay, 0.0f, 100.0f, ImVec2(0,80));
+
+		frameOffset = (frameOffset + 1) % numFrameSamples;
+	}
+
+	ImGui::Separator();
+
 	ImGui::Text("\tID Pass time: %.1f ms", GLUtils::getElapsed(idPassTimer));
 	if(m_doProgressive)
 	{
@@ -396,6 +433,7 @@ void PointCloudScene::drawGUI()
 			"\t\t\tRandom Fill Draw time: %.1f ms", GLUtils::getElapsed(randomFillDrawTimer));
 	}
 	ImGui::Text("\tOutput Pass time: %.1f ms", GLUtils::getElapsed(outputPassTimer));
+
 	ImGui::End();
 }
 

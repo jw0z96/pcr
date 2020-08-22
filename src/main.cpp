@@ -14,8 +14,8 @@
 #include "GLUtils/Timer.h"
 
 // window should process width/height changes as an event, which can be queried by FBO objects
-constexpr unsigned int DEFAULT_SCREEN_WIDTH = 800;
-constexpr unsigned int DEFAULT_SCREEN_HEIGHT = 600;
+constexpr unsigned int DEFAULT_SCREEN_WIDTH = 1024;
+constexpr unsigned int DEFAULT_SCREEN_HEIGHT = 768;
 
 // These are all things that should be handled properly eventually
 namespace SDL_GL_IMGUI_APP
@@ -74,7 +74,8 @@ int main(int argc, char* argv[])
 		SDL_WINDOWPOS_CENTERED,
 		DEFAULT_SCREEN_WIDTH,
 		DEFAULT_SCREEN_HEIGHT,
-		SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+		SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN // | SDL_WINDOW_RESIZABLE
+	);
 
 	if(!window)
 	{
@@ -121,18 +122,25 @@ int main(int argc, char* argv[])
 
 	// scope to ensure PointCloudScene dtor is called before cleanup
 	{
+		// TODO: just hand over execution to PointCloudScene
 		PointCloudScene scene;
 		scene.loadPointCloud(filepath); // TODO: handle failure to load file?
 		scene.setFramebufferParams(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT);
 
 		SDL_Event event;
 		bool running = true;
-		while(running)
+		while (running)
 		{
 			// Event handling
 			while(SDL_PollEvent(&event) != 0)
 			{
-				running = event.type != SDL_QUIT; // Exit if the window is closed
+				if (event.type == SDL_QUIT ||
+					(event.type == SDL_KEYDOWN &&
+					event.key.keysym.sym == SDLK_ESCAPE))
+				{
+					running = false; // Exit if the window is closed
+					break;
+				}
 				scene.processEvent(event);
 			}
 

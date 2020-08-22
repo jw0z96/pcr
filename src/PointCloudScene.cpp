@@ -47,9 +47,9 @@ PointCloudScene::PointCloudScene()
 	// enable programmable point size in vertex shaders, no better place to put this?
 	glEnable(GL_PROGRAM_POINT_SIZE);
 
-	setFramebufferParams(800, 600); // these constants match those in main.cpp
+	// setFramebufferParams(1024, 768); // these constants match those in main.cpp
 
-	// Set constant uniforms on the shaders
+	// Set uniforms on the shaders
 	m_pointsShader.use();
 	glUniformMatrix4fv(m_pointsShader.getUniformLocation("projection"),
 		1,

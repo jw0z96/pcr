@@ -35,6 +35,17 @@ public:
 		glBindTexture(type, m_id);
 	}
 
+	inline void bindToImageUnit(
+		const GLuint& unit,
+		const GLint& level,
+		const GLboolean& layered,
+		const GLint& layer,
+		const GLenum& access,
+		const GLenum& format) const
+	{
+		glBindImageTexture(unit, m_id, level, layered, layer, access, format);
+	}
+
 	static inline void unbind(const GLenum& type)
 	{
 		glBindTexture(type, 0);

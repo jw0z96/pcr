@@ -42,6 +42,7 @@ PointCloudScene::PointCloudScene()
 	, m_doShuffle(true)
 	, m_fillStartIndex(0)
 	, m_fillRate(10.0f)
+	, m_pointSize(1.0f)
 {
 	// enable programmable point size in vertex shaders, no better place to put this?
 	glEnable(GL_PROGRAM_POINT_SIZE);
@@ -286,12 +287,15 @@ void PointCloudScene::drawScene()
 			m_idFBO.bind();
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			glEnable(GL_DEPTH_TEST);
-			// update point shader view uniform with new view matrix
+			// update point shader uniforms
 			m_pointsShader.use();
+			// view matrix
 			glUniformMatrix4fv(m_pointsShader.getUniformLocation("view"),
 				1,
 				GL_FALSE,
 				glm::value_ptr(m_camera.getView()));
+			// point size
+			glUniform1f(m_pointsShader.getUniformLocation("pointSize"), m_pointSize);
 
 			// dispatch point draw
 			if(m_doProgressive)
@@ -354,8 +358,11 @@ void PointCloudScene::drawGUI()
 		ImGui::Checkbox("Shuffle Fill", &m_doShuffle);
 		// TODO: change this to 'fill budget', as a percentage
 		ImGui::Text("Fill Budget (per frame):");
-		ImGui::SliderFloat("%", &m_fillRate, 0.0f, 100.0f, "%.1f");
+		ImGui::SliderFloat("%##fill", &m_fillRate, 0.0f, 100.0f, "%.3f", 3.0f); // 3.0f is a power curve
 	}
+
+	ImGui::Text("Point size:");
+	ImGui::SliderFloat("%##size", &m_pointSize, 0.01f, 10.0f, "%.3f", 3.0f);
 
 	ImGui::Separator();
 

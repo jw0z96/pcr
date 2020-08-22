@@ -10,6 +10,8 @@ uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
+uniform float pointSize;
+
 const float PI =  3.14159265;
 
 vec4 barrel_distort(vec4 p)
@@ -60,7 +62,7 @@ void main()
 	gl_Position = transformedPos;
 	// gl_Position = vec4(0.5f, 0.5f, 0.0f, 1.0f);
 	// gl_PointSize = 10.0f;
-	gl_PointSize = 100.0f / gl_Position.w; // shitty size attenuation
+	gl_PointSize = (pointSize * 100.0f) / gl_Position.w; // shitty size attenuation
 	// gl_PointSize = 1.0f;
 	// this might be the draw ID and not the actual index, which might be a problem when using glDrawElements
 	// pointColour = vertexColour;
